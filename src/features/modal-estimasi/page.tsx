@@ -152,63 +152,6 @@ const defaultQuotationDetails = {
   priceValidity: '3 calendar days',
 }
 
-const defaultItems: Omit<LineItem, 'id' | 'no' | 'amount'>[] = [
-  {
-    pn: '3/150-CSB7-4F',
-    description: 'IMPELLER',
-    note: '*) OD = 260 mm, please check',
-    qty: '2',
-    unit: 'PC',
-    unitPrice: '7850.080',
-    toko: '',
-  },
-  {
-    pn: '5/150-CSB7-4F',
-    description: 'PUMP SHAFT',
-    note: '',
-    qty: '2',
-    unit: 'PC',
-    unitPrice: '2332.320',
-    toko: '',
-  },
-  {
-    pn: '30/150-CSB7-4F',
-    description: 'MOUTH RING',
-    note: '',
-    qty: '2',
-    unit: 'PC',
-    unitPrice: '913.320',
-    toko: '',
-  },
-  {
-    pn: '361/150-CSB7-4F',
-    description: 'IMPELLER KEY',
-    note: '',
-    qty: '2',
-    unit: 'PC',
-    unitPrice: '37.840',
-    toko: '',
-  },
-  {
-    pn: '401/150-CSB7-4F',
-    description: 'O RING (CASING)',
-    note: '',
-    qty: '2',
-    unit: 'PC',
-    unitPrice: '87.720',
-    toko: '',
-  },
-  {
-    pn: '37/150-CSB7-4F',
-    description: 'MACHANICAL SEAL',
-    note: '*) Please provide code book or physical photo',
-    qty: '2',
-    unit: 'PC',
-    unitPrice: '1081.880',
-    toko: '',
-  },
-]
-
 const defaultCosts: CostConfig = {
   discountPct: '-2',
   qtyBankCharge: '1',
@@ -236,42 +179,6 @@ const defaultCosts: CostConfig = {
   lainLainLs: '0',
   investorPct: '8',
   usdRate: '16000',
-}
-
-function buildItems(raw: Omit<LineItem, 'id' | 'no' | 'amount'>[]): LineItem[] {
-  return raw.map((r, i) => {
-    const actualQty = r.qtyActual && r.qtyActual.trim() ? r.qtyActual : r.qty
-
-    const variantValues = (r.actualPriceVariants ?? []).map((variant) => ({
-      toko: variant.toko ?? '',
-      qtyActual:
-        variant.qtyActual && variant.qtyActual.trim()
-          ? variant.qtyActual
-          : r.qty,
-      price: variant.price ?? '',
-    }))
-    const hasVariants = variantValues.length > 0
-    const variantTotal = variantValues.reduce(
-      (sum, variant) =>
-        sum + parseNum(variant.qtyActual) * parseNum(variant.price),
-      0
-    )
-
-    return {
-      ...r,
-      qtyActual: actualQty,
-      toko: r.toko ?? '',
-      unitPriceActual: r.unitPriceActual ?? '',
-      actualPriceVariants: variantValues,
-      id: i + 1,
-      no: i + 1,
-      amount: parseNum(r.qty) * parseNum(r.unitPrice),
-      amountActual: hasVariants
-        ? parseNum(actualQty) * parseNum(r.unitPriceActual ?? '') + variantTotal
-        : parseNum(actualQty) * parseNum(r.unitPriceActual ?? ''),
-      amountQuo: parseNum(r.qty) * parseNum(r.unitPriceQuo ?? ''),
-    }
-  })
 }
 
 // ─── Cell component ───────────────────────────────────────────────────────────
