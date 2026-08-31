@@ -1,32 +1,13 @@
 import {
   Building2,
   Calculator,
-  Construction,
   LayoutDashboard,
-  Monitor,
-  Bug,
-  ListTodo,
-  FileX,
-  HelpCircle,
-  Lock,
-  Bell,
-  Package,
   FileText,
   TrendingUp,
-  Palette,
-  ServerOff,
-  Settings,
-  Wrench,
-  UserCog,
-  UserX,
-  Users,
-  MessagesSquare,
-  ShieldCheck,
   AudioWaveform,
   Command,
   GalleryVerticalEnd,
 } from 'lucide-react'
-import { ClerkLogo } from '@/assets/clerk-logo'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
@@ -87,6 +68,7 @@ export const sidebarData: SidebarData = {
           icon: TrendingUp,
         },
 
+        /*
         {
           title: 'Tasks',
           url: '/tasks',
@@ -126,8 +108,10 @@ export const sidebarData: SidebarData = {
             },
           ],
         },
+        */
       ],
     },
+    /*
     {
       title: 'Pages',
       items: [
@@ -231,5 +215,6 @@ export const sidebarData: SidebarData = {
         },
       ],
     },
+    */
   ],
 }
