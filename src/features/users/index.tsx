@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
+import { getUsers } from '@/lib/api/users'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -9,13 +11,33 @@ import { UsersDialogs } from './components/users-dialogs'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider } from './components/users-provider'
 import { UsersTable } from './components/users-table'
-import { users } from './data/users'
+import type { User } from './data/schema'
 
 const route = getRouteApi('/_authenticated/users/')
 
 export function Users() {
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
   const search = route.useSearch()
   const navigate = route.useNavigate()
+
+  useEffect(() => {
+    getUsers()
+      .then(setUsers)
+      .catch((error) => console.error('Failed to load users:', error))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleUserSaved = (user: User) =>
+    setUsers((current) => {
+      const exists = current.some((item) => item.id === user.id)
+      return exists
+        ? current.map((item) => (item.id === user.id ? user : item))
+        : [user, ...current]
+    })
+
+  const handleUserDeleted = (id: string) =>
+    setUsers((current) => current.filter((user) => user.id !== id))
 
   return (
     <UsersProvider>
@@ -36,10 +58,17 @@ export function Users() {
           </div>
           <UsersPrimaryButtons />
         </div>
-        <UsersTable data={users} search={search} navigate={navigate} />
+        <UsersTable
+          data={loading ? [] : users}
+          search={search}
+          navigate={navigate}
+        />
       </Main>
 
-      <UsersDialogs />
+      <UsersDialogs
+        onUserSaved={handleUserSaved}
+        onUserDeleted={handleUserDeleted}
+      />
     </UsersProvider>
   )
 }

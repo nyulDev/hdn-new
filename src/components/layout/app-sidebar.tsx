@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/stores/auth-store'
 import { useLayout } from '@/context/layout-provider'
 import {
   Sidebar,
@@ -14,6 +15,14 @@ import { TeamSwitcher } from './team-switcher'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
+  const { auth } = useAuthStore()
+  const displayName = auth.user
+    ? `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim() ||
+      auth.user.username ||
+      auth.user.email
+    : sidebarData.user.name
+  const displayEmail = auth.user?.email ?? sidebarData.user.email
+
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>
@@ -29,7 +38,13 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={sidebarData.user} />
+        <NavUser
+          user={{
+            ...sidebarData.user,
+            name: displayName,
+            email: displayEmail,
+          }}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

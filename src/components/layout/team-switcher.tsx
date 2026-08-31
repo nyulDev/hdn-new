@@ -26,7 +26,7 @@ type TeamSwitcherProps = {
 
 export function TeamSwitcher({ teams }: TeamSwitcherProps) {
   const { isMobile } = useSidebar()
-  const [activeTeam, setActiveTeam] = React.useState(teams[0])
+  const [, setActiveTeam] = React.useState(teams[0])
 
   return (
     <SidebarMenu>
@@ -37,14 +37,12 @@ export function TeamSwitcher({ teams }: TeamSwitcherProps) {
               size='lg'
               className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
             >
-              <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
-                <activeTeam.logo className='size-4' />
-              </div>
-              <div className='grid flex-1 text-start text-sm leading-tight'>
-                <span className='truncate font-semibold'>
-                  {activeTeam.name}
-                </span>
-                <span className='truncate text-xs'>{activeTeam.plan}</span>
+              <div className='flex h-14 min-w-0 flex-1 items-center justify-center'>
+                <img
+                  src='/images/logo.png'
+                  alt='PT Haluan Daya Niaga'
+                  className='max-h-14 w-auto max-w-full object-contain'
+                />
               </div>
               <ChevronsUpDown className='ms-auto' />
             </SidebarMenuButton>

@@ -1,4 +1,6 @@
 import {
+  Building2,
+  Calculator,
   Construction,
   LayoutDashboard,
   Monitor,
@@ -9,6 +11,8 @@ import {
   Lock,
   Bell,
   Package,
+  FileText,
+  TrendingUp,
   Palette,
   ServerOff,
   Settings,
@@ -57,6 +61,32 @@ export const sidebarData: SidebarData = {
           url: '/',
           icon: LayoutDashboard,
         },
+        {
+          title: 'Customers',
+          url: '/customers',
+          icon: Building2,
+        },
+        {
+          title: 'Modal Estimasi',
+          url: '/modal-estimasi',
+          icon: Calculator,
+        },
+        {
+          title: 'Quotation',
+          url: '/quotation',
+          icon: FileText,
+        },
+        {
+          title: 'Modal Aktual',
+          url: '/modal-aktual',
+          icon: FileText,
+        },
+        {
+          title: 'Profit',
+          url: '/profit',
+          icon: TrendingUp,
+        },
+
         {
           title: 'Tasks',
           url: '/tasks',

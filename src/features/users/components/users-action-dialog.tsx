@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { createUser, updateUser, type UserPayload } from '@/lib/api/users'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -97,12 +97,14 @@ type UserActionDialogProps = {
   currentRow?: User
   open: boolean
   onOpenChange: (open: boolean) => void
+  onUserSaved?: (user: User) => void
 }
 
 export function UsersActionDialog({
   currentRow,
   open,
   onOpenChange,
+  onUserSaved,
 }: UserActionDialogProps) {
   const isEdit = !!currentRow
   const form = useForm<UserForm>({
@@ -127,9 +129,21 @@ export function UsersActionDialog({
         },
   })
 
-  const onSubmit = (values: UserForm) => {
+  const onSubmit = async (values: UserForm) => {
+    const payload: UserPayload = {
+      firstName: values.firstName,
+      lastName: values.lastName,
+      username: values.username,
+      email: values.email,
+      phoneNumber: values.phoneNumber,
+      role: values.role as UserPayload['role'],
+      password: values.password,
+    }
+    const savedUser = isEdit
+      ? await updateUser(currentRow.id, payload)
+      : await createUser(payload)
+    onUserSaved?.(savedUser)
     form.reset()
-    showSubmittedData(values)
     onOpenChange(false)
   }
 
