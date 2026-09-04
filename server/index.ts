@@ -8,6 +8,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 import customersRouter from './routes/customers';
 import estimasiRouter from './routes/estimasi';
+import invoiceRouter from './routes/invoice';
 import usersRouter from './routes/users';
 
 const app = express();
@@ -20,6 +21,7 @@ app.use(express.json({ limit: '10mb' }));
 // Routes
 app.use('/api/customers', customersRouter);
 app.use('/api/estimasi', estimasiRouter);
+app.use('/api/invoice', invoiceRouter);
 app.use('/api/users', usersRouter);
 
 // Health check

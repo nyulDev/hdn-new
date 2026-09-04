@@ -24,9 +24,11 @@ import { Route as authOtpRouteImport } from './routes/(auth)/otp'
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
 import { Route as ClerkAuthenticatedRouteRouteImport } from './routes/clerk/_authenticated/route'
 import { Route as ClerkauthRouteRouteImport } from './routes/clerk/(auth)/route'
+import { Route as AuthenticatedTtbRouteRouteImport } from './routes/_authenticated/ttb/route'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedQuotationRouteRouteImport } from './routes/_authenticated/quotation/route'
 import { Route as AuthenticatedProfitRouteRouteImport } from './routes/_authenticated/profit/route'
+import { Route as AuthenticatedInvoiceRouteRouteImport } from './routes/_authenticated/invoice/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
@@ -117,6 +119,11 @@ const ClerkauthRouteRoute = ClerkauthRouteRouteImport.update({
   id: '/(auth)',
   getParentRoute: () => ClerkRouteRoute,
 } as any)
+const AuthenticatedTtbRouteRoute = AuthenticatedTtbRouteRouteImport.update({
+  id: '/ttb',
+  path: '/ttb',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRouteRoute =
   AuthenticatedSettingsRouteRouteImport.update({
     id: '/settings',
@@ -133,6 +140,12 @@ const AuthenticatedProfitRouteRoute =
   AuthenticatedProfitRouteRouteImport.update({
     id: '/profit',
     path: '/profit',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedInvoiceRouteRoute =
+  AuthenticatedInvoiceRouteRouteImport.update({
+    id: '/invoice',
+    path: '/invoice',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
@@ -235,9 +248,11 @@ const AuthenticatedErrorsErrorRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/invoice': typeof AuthenticatedInvoiceRouteRoute
   '/profit': typeof AuthenticatedProfitRouteRoute
   '/quotation': typeof AuthenticatedQuotationRouteRoute
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/ttb': typeof AuthenticatedTtbRouteRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
@@ -268,8 +283,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/invoice': typeof AuthenticatedInvoiceRouteRoute
   '/profit': typeof AuthenticatedProfitRouteRoute
   '/quotation': typeof AuthenticatedQuotationRouteRoute
+  '/ttb': typeof AuthenticatedTtbRouteRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
@@ -303,9 +320,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/clerk': typeof ClerkRouteRouteWithChildren
+  '/_authenticated/invoice': typeof AuthenticatedInvoiceRouteRoute
   '/_authenticated/profit': typeof AuthenticatedProfitRouteRoute
   '/_authenticated/quotation': typeof AuthenticatedQuotationRouteRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/_authenticated/ttb': typeof AuthenticatedTtbRouteRoute
   '/clerk/(auth)': typeof ClerkauthRouteRouteWithChildren
   '/clerk/_authenticated': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
@@ -342,9 +361,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/clerk'
+    | '/invoice'
     | '/profit'
     | '/quotation'
     | '/settings'
+    | '/ttb'
     | '/forgot-password'
     | '/otp'
     | '/sign-in'
@@ -375,8 +396,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/clerk'
+    | '/invoice'
     | '/profit'
     | '/quotation'
+    | '/ttb'
     | '/forgot-password'
     | '/otp'
     | '/sign-in'
@@ -409,9 +432,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/clerk'
+    | '/_authenticated/invoice'
     | '/_authenticated/profit'
     | '/_authenticated/quotation'
     | '/_authenticated/settings'
+    | '/_authenticated/ttb'
     | '/clerk/(auth)'
     | '/clerk/_authenticated'
     | '/(auth)/forgot-password'
@@ -566,6 +591,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClerkauthRouteRouteImport
       parentRoute: typeof ClerkRouteRoute
     }
+    '/_authenticated/ttb': {
+      id: '/_authenticated/ttb'
+      path: '/ttb'
+      fullPath: '/ttb'
+      preLoaderRoute: typeof AuthenticatedTtbRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -585,6 +617,13 @@ declare module '@tanstack/react-router' {
       path: '/profit'
       fullPath: '/profit'
       preLoaderRoute: typeof AuthenticatedProfitRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/invoice': {
+      id: '/_authenticated/invoice'
+      path: '/invoice'
+      fullPath: '/invoice'
+      preLoaderRoute: typeof AuthenticatedInvoiceRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/users/': {
@@ -733,9 +772,11 @@ const AuthenticatedSettingsRouteRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedInvoiceRouteRoute: typeof AuthenticatedInvoiceRouteRoute
   AuthenticatedProfitRouteRoute: typeof AuthenticatedProfitRouteRoute
   AuthenticatedQuotationRouteRoute: typeof AuthenticatedQuotationRouteRoute
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
+  AuthenticatedTtbRouteRoute: typeof AuthenticatedTtbRouteRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
@@ -749,9 +790,11 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedInvoiceRouteRoute: AuthenticatedInvoiceRouteRoute,
   AuthenticatedProfitRouteRoute: AuthenticatedProfitRouteRoute,
   AuthenticatedQuotationRouteRoute: AuthenticatedQuotationRouteRoute,
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
+  AuthenticatedTtbRouteRoute: AuthenticatedTtbRouteRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,

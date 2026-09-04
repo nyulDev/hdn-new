@@ -3,6 +3,7 @@ import {
   Calculator,
   LayoutDashboard,
   FileText,
+  ReceiptText,
   TrendingUp,
   AudioWaveform,
   Command,
@@ -58,14 +59,24 @@ export const sidebarData: SidebarData = {
           icon: FileText,
         },
         {
+          title: 'Profit',
+          url: '/profit',
+          icon: TrendingUp,
+        },
+        {
           title: 'Modal Aktual',
           url: '/modal-aktual',
           icon: FileText,
         },
         {
-          title: 'Profit',
-          url: '/profit',
-          icon: TrendingUp,
+          title: 'Invoice',
+          url: '/invoice',
+          icon: ReceiptText,
+        },
+        {
+          title: 'TTB',
+          url: '/ttb',
+          icon: FileText,
         },
 
         /*

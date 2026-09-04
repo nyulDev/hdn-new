@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { getCustomers, type Customer } from '@/lib/api/customers'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -19,6 +21,21 @@ import { Overview } from './components/overview'
 import { RecentSales } from './components/recent-sales'
 
 export function Dashboard() {
+  const [customers, setCustomers] = useState<Customer[]>([])
+
+  useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        const data = await getCustomers()
+        setCustomers(data)
+      } catch (error) {
+        console.error('Failed to load customers:', error)
+      }
+    }
+
+    void loadCustomers()
+  }, [])
+
   return (
     <>
       {/* ===== Top Heading ===== */}
@@ -60,7 +77,7 @@ export function Dashboard() {
               <Card>
                 <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
                   <CardTitle className='text-sm font-medium'>
-                    Total Revenue
+                    Total Customers
                   </CardTitle>
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
@@ -76,12 +93,13 @@ export function Dashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className='text-2xl font-bold'>$45,231.89</div>
+                  <div className='text-2xl font-bold'>{customers.length}</div>
                   <p className='text-xs text-muted-foreground'>
-                    +20.1% from last month
+                    pelanggan terdaftar
                   </p>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
                   <CardTitle className='text-sm font-medium'>

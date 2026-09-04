@@ -5,7 +5,7 @@ import {
   useCallback,
   useEffect,
 } from 'react'
-import { Plus, Trash2, Printer, RefreshCw, Save } from 'lucide-react'
+import { Plus, Trash2, Printer, RefreshCw, Save, FileText } from 'lucide-react'
 import { getCustomers, type Customer } from '@/lib/api/customers'
 import {
   saveEstimasi,
@@ -13,10 +13,12 @@ import {
   getEstimasiByNoQuo,
   updateEstimasi,
   updateEstimasiByNoQuo,
+  deleteEstimasi,
   type EstimasiList,
 } from '@/lib/api/estimasi'
 import { getNetProfitEstimatePct } from '@/lib/profit'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -27,8 +29,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -69,6 +73,9 @@ interface FormInfo {
   dept: string
   noQuo: string
   noRfs: string
+  supplyLocation: string
+  sktd: boolean
+  revisi: string
 }
 
 interface CostConfig {
@@ -98,6 +105,15 @@ interface CostConfig {
   lainLainLs: string
   investorPct: string
   usdRate: string
+  otherCosts: OtherCost[]
+}
+
+interface OtherCost {
+  id: number
+  description: string
+  qty: string
+  unit: string
+  unitPrice: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -141,6 +157,9 @@ const defaultFormInfo: FormInfo = {
   dept: '',
   noQuo: '',
   noRfs: '',
+  supplyLocation: 'JAKARTA',
+  sktd: false,
+  revisi: '0',
 }
 
 const defaultQuotationDetails = {
@@ -179,6 +198,7 @@ const defaultCosts: CostConfig = {
   lainLainLs: '0',
   investorPct: '8',
   usdRate: '16000',
+  otherCosts: [],
 }
 
 // ─── Cell component ───────────────────────────────────────────────────────────
@@ -256,8 +276,8 @@ export function ModalEstimasi({
   const [costs, setCosts] = useState<CostConfig>(defaultCosts)
   const [customers, setCustomers] = useState<Customer[]>([])
 
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
-  const [judulEstimasi, setJudulEstimasi] = useState('')
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [savedList, setSavedList] = useState<EstimasiList[]>([])
 
   useEffect(() => {
@@ -285,6 +305,23 @@ export function ModalEstimasi({
       })
   }, [quotationMode])
   const [loadingQuotation, setLoadingQuotation] = useState(false)
+  // Nomor urut quotation (bagian pertama dari format No. Quo)
+  const [noQuoNumber, setNoQuoNumber] = useState('')
+
+  // Sync formInfo.noQuo setiap kali nomor urut, dept, atau revisi berubah
+  useEffect(() => {
+    if (!quotationMode) {
+      const dept = formInfo.dept.trim().toUpperCase()
+      const year = new Date().getFullYear()
+      const revisiSegment =
+        formInfo.revisi && formInfo.revisi !== '0' ? `-R${formInfo.revisi}` : ''
+      const assembled = noQuoNumber
+        ? `${noQuoNumber}${revisiSegment}-PH-${dept || 'HDN'}-${year}`
+        : ''
+      setFormInfo((prev) => ({ ...prev, noQuo: assembled }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noQuoNumber, formInfo.dept, formInfo.revisi, quotationMode])
   const [quotationRange, setQuotationRange] = useState('')
   const [estimasiPct, setEstimasiPct] = useState('')
   const [quotationDiscountPct, setQuotationDiscountPct] = useState('10')
@@ -305,13 +342,15 @@ export function ModalEstimasi({
   )
 
   const handleSave = async () => {
-    if (!judulEstimasi.trim()) {
-      alert('Judul tidak boleh kosong')
-      return
-    }
+    const judul = formInfo.noQuo.trim() || 'Estimasi Baru'
     try {
+      const status = actualMode
+        ? 'modal_aktual'
+        : quotationMode
+          ? 'quotation'
+          : 'modal_estimasi'
       const saveData = {
-        judul: judulEstimasi,
+        judul: judul,
         formInfo: quotationMode
           ? {
               ...formInfo,
@@ -324,6 +363,7 @@ export function ModalEstimasi({
           : formInfo,
         items,
         costs,
+        status,
       }
       const saved =
         quotationMode &&
@@ -341,8 +381,6 @@ export function ModalEstimasi({
             )
           : [saved, ...current]
       })
-      setSaveDialogOpen(false)
-      setJudulEstimasi('')
       setEditingEstimasiId(null)
     } catch (e) {
       alert('Gagal menyimpan: ' + (e as Error).message)
@@ -359,16 +397,29 @@ export function ModalEstimasi({
     try {
       const data = await getEstimasiByNoQuo(noQuo)
       setEditingEstimasiId(data.id)
-      setJudulEstimasi(data.judul)
-      const loadedFormInfo = data.formInfo || defaultFormInfo
+      const loadedFormInfo = {
+        ...defaultFormInfo,
+        ...(data.formInfo || {}),
+        supplyLocation:
+          data.formInfo?.supplyLocation || defaultFormInfo.supplyLocation,
+      }
       setFormInfo(loadedFormInfo)
+      if (loadedFormInfo.noQuo) {
+        setNoQuoNumber(loadedFormInfo.noQuo.split('-')[0] || '')
+      } else {
+        setNoQuoNumber('')
+      }
       setQuotationRange(String(loadedFormInfo.quotationRange ?? ''))
       setQuotationDiscountPct(
         String(loadedFormInfo.quotationDiscountPct ?? '10')
       )
       setQuotationPpnPct(String(loadedFormInfo.quotationPpnPct ?? '11'))
       setItems(data.items || [])
-      setCosts(data.costs || defaultCosts)
+      setCosts({
+        ...defaultCosts,
+        ...(data.costs || {}),
+        otherCosts: data.costs?.otherCosts ?? [],
+      })
       // Persentase Estimasi (%) diambil dari Net Profit estimasi persentase
       // pada page Profit berdasarkan No. Quo
       setEstimasiPct(
@@ -388,13 +439,32 @@ export function ModalEstimasi({
     }
   }
 
+  const handleDeleteQuotation = async () => {
+    if (!formInfo.noQuo.trim() || editingEstimasiId === null) {
+      alert('Tidak ada data quotation yang sedang dimuat')
+      return
+    }
+
+    try {
+      await deleteEstimasi(editingEstimasiId)
+      setSavedList((current) =>
+        current.filter((estimasi) => estimasi.id !== editingEstimasiId)
+      )
+      setEditingEstimasiId(null)
+      resetAll()
+      alert('Data quotation berhasil dihapus')
+    } catch (e) {
+      alert('Gagal menghapus data quotation: ' + (e as Error).message)
+    }
+  }
+
   const getQuotationUnitPrice = (item: LineItem) => {
     if (item.unitPriceQuo?.trim()) return parseNum(item.unitPriceQuo)
     const range = parseNum(quotationRange)
     return range === 0 ? 0 : (parseNum(item.unitPrice) * range) / 100
   }
 
-  const updateInfo = (field: keyof FormInfo, value: string) =>
+  const updateInfo = (field: keyof FormInfo, value: string | boolean) =>
     setFormInfo((prev) => ({ ...prev, [field]: value }))
 
   const customerCompanies = [
@@ -566,6 +636,40 @@ export function ModalEstimasi({
   const updateCost = (field: keyof CostConfig, value: string) =>
     setCosts((prev) => ({ ...prev, [field]: value }))
 
+  const addOtherCost = () => {
+    setCosts((prev) => ({
+      ...prev,
+      otherCosts: [
+        ...prev.otherCosts,
+        {
+          id: Date.now(),
+          description: '',
+          qty: '1',
+          unit: 'LS',
+          unitPrice: '0',
+        },
+      ],
+    }))
+  }
+
+  const updateOtherCost = (
+    id: number,
+    field: keyof Omit<OtherCost, 'id'>,
+    value: string
+  ) =>
+    setCosts((prev) => ({
+      ...prev,
+      otherCosts: prev.otherCosts.map((cost) =>
+        cost.id === id ? { ...cost, [field]: value } : cost
+      ),
+    }))
+
+  const removeOtherCost = (id: number) =>
+    setCosts((prev) => ({
+      ...prev,
+      otherCosts: prev.otherCosts.filter((cost) => cost.id !== id),
+    }))
+
   // ── calculations ──
   const totalModalSparepart = actualMode
     ? items.reduce((s, it) => s + (it.amountActual ?? 0), 0)
@@ -586,11 +690,10 @@ export function ModalEstimasi({
   const localCostIdr =
     parseNum(costs.qtyLocalCost) * parseNum(costs.localCostUsd) * usdRate // USD → IDR
   const feeKurirIdr = parseNum(costs.qtyFeeKurir) * parseNum(costs.feeKurir) // Unit Price sudah IDR
-  const trukIdr = parseNum(costs.qtyTruk) * parseNum(costs.trukLs) // LS sudah IDR
-  const serviceboatIdr =
-    parseNum(costs.qtyServiceboat) * parseNum(costs.serviceboatLs) // LS sudah IDR
-  const lainIdr = parseNum(costs.qtyLainLain) * parseNum(costs.lainLainLs) // LS sudah IDR
-
+  const otherCostsTotal = costs.otherCosts.reduce(
+    (total, cost) => total + parseNum(cost.qty) * parseNum(cost.unitPrice),
+    0
+  )
   const subTotal =
     afterDiscount +
     bankChargeIdr +
@@ -602,9 +705,7 @@ export function ModalEstimasi({
     seaDoorIdr +
     localCostIdr +
     feeKurirIdr +
-    trukIdr +
-    serviceboatIdr +
-    lainIdr
+    otherCostsTotal
 
   const investorAmt = (parseNum(costs.investorPct) / 100) * subTotal
   const grandTotal = subTotal + investorAmt
@@ -618,6 +719,10 @@ export function ModalEstimasi({
   const quotationPpn =
     quotationAfterDiscount * (parseNum(quotationPpnPct) / 100)
   const quotationTotal = quotationAfterDiscount + quotationPpn
+  // Jika SKTD aktif → TOTAL (IDR) = Total after discount (tanpa PPN)
+  const effectiveQuotationTotal = formInfo.sktd
+    ? quotationAfterDiscount
+    : quotationTotal
   const tableHeaders = [
     'No',
     'P/N',
@@ -696,15 +801,22 @@ export function ModalEstimasi({
                   variant='outline'
                   size='sm'
                   className='gap-1.5'
-                  onClick={() =>
-                    editingEstimasiId !== null
-                      ? void handleSave()
-                      : setSaveDialogOpen(true)
-                  }
+                  onClick={() => void handleSave()}
                 >
                   <Save className='h-3.5 w-3.5' />
                   Simpan
                 </Button>
+                {editingEstimasiId !== null && (
+                  <Button
+                    variant='destructive'
+                    size='sm'
+                    className='gap-1.5'
+                    onClick={() => setDeleteConfirmOpen(true)}
+                  >
+                    <Trash2 className='h-3.5 w-3.5' />
+                    Hapus
+                  </Button>
+                )}
               </>
             )}
             {quotationMode && (
@@ -712,12 +824,21 @@ export function ModalEstimasi({
                 variant='outline'
                 size='sm'
                 className='gap-1.5'
-                onClick={() => setSaveDialogOpen(true)}
+                onClick={() => void handleSave()}
               >
                 <Save className='h-3.5 w-3.5' />
                 Simpan
               </Button>
             )}
+            <Button
+              variant='outline'
+              size='sm'
+              className='gap-1.5'
+              onClick={() => setReportDialogOpen(true)}
+            >
+              <FileText className='h-3.5 w-3.5' />
+              Report
+            </Button>
             <Button
               size='sm'
               className='gap-1.5'
@@ -808,74 +929,178 @@ export function ModalEstimasi({
                   />
                 </div>
               )}
-              <div className='flex items-center gap-2'>
-                <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                  No. Quo
-                </Label>
-                {quotationMode ? (
-                  <>
-                    <Input
-                      value={formInfo.noQuo}
-                      onChange={(e) => {
-                        updateInfo('noQuo', e.target.value)
-                        if (
-                          savedList.some(
-                            (estimasi) => estimasi.noQuo === e.target.value
-                          )
-                        ) {
-                          void handleLoadQuotation(e.target.value)
-                        }
-                      }}
-                      list='quotation-numbers'
-                      placeholder='Cari No. Quo...'
-                      disabled={loadingQuotation}
-                      className='h-8 flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-50'
-                    />
-                    <datalist id='quotation-numbers'>
-                      {savedList
-                        .filter((estimasi) => estimasi.noQuo)
-                        .map((estimasi) => (
-                          <option key={estimasi.id} value={estimasi.noQuo} />
-                        ))}
-                    </datalist>
-                  </>
-                ) : (
-                  <Input
-                    value={formInfo.noQuo}
-                    onChange={(e) => updateInfo('noQuo', e.target.value)}
-                    placeholder='Nomor quotation'
-                    className='h-8 flex-1 text-xs'
-                  />
-                )}
-              </div>
               {quotationMode && (
+                <div className='col-span-full'>
+                  {/* Satu baris: No. Quo | Range (%) | Supply Location | SKTD | Revisi */}
+                  <div className='flex flex-wrap items-center gap-x-6 gap-y-2'>
+                    <div className='flex items-center gap-2'>
+                      <Label className='w-16 shrink-0 text-xs font-semibold text-muted-foreground'>
+                        No. Quo
+                      </Label>
+                      <Input
+                        value={formInfo.noQuo}
+                        onChange={(e) => {
+                          updateInfo('noQuo', e.target.value)
+                          if (
+                            savedList.some(
+                              (estimasi) => estimasi.noQuo === e.target.value
+                            )
+                          ) {
+                            void handleLoadQuotation(e.target.value)
+                          }
+                        }}
+                        list='quotation-numbers'
+                        placeholder='Cari No. Quo...'
+                        disabled={loadingQuotation}
+                        className='h-8 w-[201px] min-w-0 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+                      />
+                      <datalist id='quotation-numbers'>
+                        {savedList
+                          .filter((estimasi) => estimasi.noQuo)
+                          .map((estimasi) => (
+                            <option key={estimasi.id} value={estimasi.noQuo} />
+                          ))}
+                      </datalist>
+                    </div>
+
+                    <div className='flex items-center gap-2'>
+                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                        Range (%)
+                      </Label>
+                      <Input
+                        type='number'
+                        min='0'
+                        max='999'
+                        value={quotationRange}
+                        onChange={(e) =>
+                          setQuotationRange(e.target.value.slice(0, 3))
+                        }
+                        placeholder=''
+                        className='h-8 w-20 flex-none text-xs'
+                      />
+                    </div>
+
+                    <div className='flex items-center gap-2'>
+                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                        Persentase Estimasi (%)
+                      </Label>
+                      <Input
+                        value={estimasiPct}
+                        readOnly
+                        className='h-8 w-20 flex-none bg-muted/30 text-xs text-muted-foreground'
+                      />
+                    </div>
+
+                    <div className='flex items-center gap-2'>
+                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                        Supply Location
+                      </Label>
+                      <Input
+                        value={formInfo.supplyLocation}
+                        onChange={(e) =>
+                          updateInfo('supplyLocation', e.target.value)
+                        }
+                        placeholder='Jakarta'
+                        className='h-8 w-[100px] flex-none text-xs'
+                      />
+                    </div>
+
+                    <label className='flex items-center gap-2 text-xs font-medium whitespace-nowrap text-muted-foreground'>
+                      <Checkbox
+                        checked={formInfo.sktd}
+                        onCheckedChange={(checked) =>
+                          updateInfo('sktd', checked === true)
+                        }
+                        aria-label='SKTD'
+                        className='h-4 w-4'
+                      />
+                      <span>SKTD</span>
+                    </label>
+
+                    <div className='flex items-center gap-2'>
+                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                        Revisi
+                      </Label>
+                      <RadioGroup
+                        value={formInfo.revisi}
+                        onValueChange={(value) => {
+                          updateInfo('revisi', value)
+                          if (quotationMode && formInfo.noQuo) {
+                            const baseNumber = formInfo.noQuo.split('-')[0]
+                            const dept =
+                              formInfo.dept.trim().toUpperCase() || 'HDN'
+                            const year = new Date().getFullYear()
+                            const revisiSegment =
+                              value && value !== '0' ? `-R${value}` : ''
+                            if (baseNumber) {
+                              const newNoQuo = `${baseNumber}${revisiSegment}-PH-${dept}-${year}`
+                              updateInfo('noQuo', newNoQuo)
+                            }
+                          }
+                        }}
+                        className='flex items-center gap-2'
+                        aria-label='Revisi quotation'
+                      >
+                        {['0', '1', '2', '3'].map((value) => (
+                          <label
+                            key={value}
+                            className='flex items-center gap-1 text-[11px] text-muted-foreground'
+                          >
+                            <RadioGroupItem
+                              value={value}
+                              className='h-3.5 w-3.5'
+                            />
+                            <span>{value}</span>
+                          </label>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!quotationMode && (
                 <div className='flex items-center gap-2'>
                   <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    Range (%)
+                    No. Quo
                   </Label>
+                  {/* Input nomor urut saja */}
                   <Input
-                    type='number'
-                    min='0'
-                    max='999'
-                    value={quotationRange}
-                    onChange={(e) =>
-                      setQuotationRange(e.target.value.slice(0, 3))
-                    }
-                    placeholder=''
+                    value={noQuoNumber}
+                    onChange={(e) => setNoQuoNumber(e.target.value)}
+                    placeholder='0000'
                     className='h-8 w-20 flex-none text-xs'
                   />
-                  <Label className='w-24 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    Persentase Estimasi (%)
-                  </Label>
-                  <Input
-                    type='number'
-                    step='0.01'
-                    value={estimasiPct}
-                    placeholder='0'
-                    readOnly
-                    aria-label='Nilai Net Profit estimasi berdasarkan No. Quo'
-                    className='h-8 w-20 flex-none text-xs'
-                  />
+                  {/* Bagian read-only: -[R{n}]-PH-{DEPT}-{YEAR} */}
+                  <div className='flex items-center gap-0'>
+                    {formInfo.revisi && formInfo.revisi !== '0' && (
+                      <>
+                        <span className='text-xs text-muted-foreground'>-</span>
+                        <Input
+                          value={`R${formInfo.revisi}`}
+                          readOnly
+                          className='h-8 w-10 flex-none cursor-default border-dashed bg-amber-50 px-1 text-center text-xs text-amber-600 select-none focus-visible:ring-0'
+                        />
+                      </>
+                    )}
+                    <span className='text-xs text-muted-foreground'>-</span>
+                    <Input
+                      value='PH'
+                      readOnly
+                      className='h-8 w-10 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                    />
+                    <span className='text-xs text-muted-foreground'>-</span>
+                    <Input
+                      value={formInfo.dept.trim().toUpperCase() || 'HDN'}
+                      readOnly
+                      className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                    />
+                    <span className='text-xs text-muted-foreground'>-</span>
+                    <Input
+                      value={new Date().getFullYear()}
+                      readOnly
+                      className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                    />
+                  </div>
                 </div>
               )}
               {!quotationMode && (
@@ -1353,7 +1578,7 @@ export function ModalEstimasi({
                           />
                           <QuotationSummaryRow
                             label='TOTAL (IDR)'
-                            value={quotationTotal}
+                            value={effectiveQuotationTotal}
                             strong
                           />
                         </div>
@@ -1729,106 +1954,89 @@ export function ModalEstimasi({
                       <td />
                     </CostRow>
 
-                    {/* Truk */}
-                    <CostSubRow label='a. Truk Jakarta-Surabaya/Jepara/Cilacap/Morowali'>
-                      <td className='border-r'>
-                        <Cell
-                          value={costs.qtyTruk}
-                          onChange={(v) => updateCost('qtyTruk', v)}
-                          align='center'
-                          highlight='yellow'
-                          formatThousand
-                        />
-                      </td>
-                      <td className='border-r'>
-                        <Cell value='LS' readOnly align='center' />
-                      </td>
-                      <td className='border-r'>
-                        <Cell
-                          value={costs.trukLs}
-                          onChange={(v) => updateCost('trukLs', v)}
-                          align='right'
-                          highlight='yellow'
-                          formatThousand
-                        />
-                      </td>
-                      <td className='border-r'>
-                        <Cell
-                          value={trukIdr === 0 ? '0' : fmt(trukIdr)}
-                          readOnly
-                          align='right'
-                        />
-                      </td>
-                      <td />
-                    </CostSubRow>
+                    {costs.otherCosts.map((cost) => (
+                      <CostSubRow
+                        key={cost.id}
+                        label={
+                          <Input
+                            value={cost.description}
+                            onChange={(event) =>
+                              updateOtherCost(
+                                cost.id,
+                                'description',
+                                event.target.value
+                              )
+                            }
+                            placeholder='Nama cost lain'
+                            className='h-6 rounded-none border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-1'
+                          />
+                        }
+                      >
+                        <td className='border-r'>
+                          <Cell
+                            value={cost.qty}
+                            onChange={(value) =>
+                              updateOtherCost(cost.id, 'qty', value)
+                            }
+                            align='center'
+                            formatThousand
+                          />
+                        </td>
+                        <td className='border-r'>
+                          <Cell
+                            value={cost.unit}
+                            onChange={(value) =>
+                              updateOtherCost(cost.id, 'unit', value)
+                            }
+                            align='center'
+                          />
+                        </td>
+                        <td className='border-r'>
+                          <Cell
+                            value={cost.unitPrice}
+                            onChange={(value) =>
+                              updateOtherCost(cost.id, 'unitPrice', value)
+                            }
+                            align='right'
+                            highlight='yellow'
+                            formatThousand
+                          />
+                        </td>
+                        <td className='border-r'>
+                          <Cell
+                            value={fmt(
+                              parseNum(cost.qty) * parseNum(cost.unitPrice)
+                            )}
+                            readOnly
+                            align='right'
+                          />
+                        </td>
+                        <td className='text-center'>
+                          <button
+                            type='button'
+                            onClick={() => removeOtherCost(cost.id)}
+                            className='p-0.5 text-muted-foreground transition-colors hover:text-destructive'
+                            title='Hapus cost lain'
+                          >
+                            <Trash2 className='h-3 w-3' />
+                          </button>
+                        </td>
+                      </CostSubRow>
+                    ))}
 
-                    {/* Service boat */}
-                    <CostSubRow label='b. Service boat'>
-                      <td className='border-r'>
-                        <Cell
-                          value={costs.qtyServiceboat}
-                          onChange={(v) => updateCost('qtyServiceboat', v)}
-                          align='center'
-                          highlight='yellow'
-                          formatThousand
-                        />
-                      </td>
-                      <td className='border-r'>
-                        <Cell value='LS' readOnly align='center' />
-                      </td>
-                      <td className='border-r'>
-                        <Cell
-                          value={costs.serviceboatLs}
-                          onChange={(v) => updateCost('serviceboatLs', v)}
-                          align='right'
-                          highlight='yellow'
-                          formatThousand
-                        />
-                      </td>
-                      <td className='border-r'>
-                        <Cell
-                          value={
-                            serviceboatIdr === 0 ? '0' : fmt(serviceboatIdr)
-                          }
-                          readOnly
-                          align='right'
-                        />
+                    <tr className='border-b hover:bg-muted/10'>
+                      <td className='border-r' />
+                      <td className='border-r' colSpan={5}>
+                        <button
+                          type='button'
+                          onClick={addOtherCost}
+                          className='px-2 py-1 text-xs text-primary hover:underline'
+                        >
+                          + Cost Lain
+                        </button>
                       </td>
                       <td />
-                    </CostSubRow>
-
-                    {/* Lain-lain */}
-                    <CostSubRow label='c. Lain-lain (Agent, bensin, dll)'>
-                      <td className='border-r'>
-                        <Cell
-                          value={costs.qtyLainLain}
-                          onChange={(v) => updateCost('qtyLainLain', v)}
-                          align='center'
-                          highlight='yellow'
-                          formatThousand
-                        />
-                      </td>
-                      <td className='border-r'>
-                        <Cell value='LS' readOnly align='center' />
-                      </td>
-                      <td className='border-r'>
-                        <Cell
-                          value={costs.lainLainLs}
-                          onChange={(v) => updateCost('lainLainLs', v)}
-                          align='right'
-                          highlight='yellow'
-                          formatThousand
-                        />
-                      </td>
-                      <td className='border-r'>
-                        <Cell
-                          value={lainIdr === 0 ? '0' : fmt(lainIdr)}
-                          readOnly
-                          align='right'
-                        />
-                      </td>
-                      <td />
-                    </CostSubRow>
+                    </tr>
 
                     {/* SUB TOTAL */}
                     <tr className='border-t-2 border-b bg-muted/40'>
@@ -1917,39 +2125,463 @@ export function ModalEstimasi({
         </p>
       </Main>
 
-      {/* Save Dialog */}
-      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent className='sm:max-w-md'>
-          <DialogHeader>
-            <DialogTitle>
-              Simpan {quotationMode ? 'Quotation' : 'Estimasi'}
-            </DialogTitle>
-            <DialogDescription>
-              Beri judul untuk {quotationMode ? 'quotation' : 'estimasi'} ini
-              agar mudah dicari nanti.
-            </DialogDescription>
-          </DialogHeader>
-          <div className='py-4'>
-            <Label htmlFor='judul'>
-              Judul {quotationMode ? 'Quotation' : 'Estimasi'}
-            </Label>
-            <Input
-              id='judul'
-              value={judulEstimasi}
-              onChange={(e) => setJudulEstimasi(e.target.value)}
-              placeholder='Contoh: Estimasi MV. Andhika Alisha Jan 2025'
-              className='mt-2'
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title='Hapus data quotation'
+        desc={
+          <>
+            Apakah Anda yakin ingin menghapus data{' '}
+            <span className='font-semibold'>{formInfo.noQuo || 'No. Quo'}</span>
+            ?
+            <br />
+            Tindakan ini akan menghapus data yang sedang dimuat dan tidak dapat
+            dibatalkan.
+          </>
+        }
+        confirmText='Hapus'
+        destructive
+        disabled={!formInfo.noQuo.trim() || editingEstimasiId === null}
+        handleConfirm={async () => {
+          setDeleteConfirmOpen(false)
+          await handleDeleteQuotation()
+        }}
+      />
+
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-5xl'>
+          {!quotationMode && (
+            <DialogHeader className='print:hidden'>
+              <DialogTitle>Report Modal Estimasi</DialogTitle>
+              <DialogDescription>
+                Pratinjau laporan biaya berdasarkan data yang sedang dibuka.
+              </DialogDescription>
+            </DialogHeader>
+          )}
+          {quotationMode ? (
+            <QuotationReport
+              formInfo={formInfo}
+              items={items}
+              quotationRange={quotationRange}
+              quotationDetails={quotationDetails}
+              quotationSubtotal={quotationSubtotal}
+              quotationDiscount={quotationDiscount}
+              quotationAfterDiscount={quotationAfterDiscount}
+              quotationPpn={quotationPpn}
+              quotationTotal={effectiveQuotationTotal}
+              quotationPpnPct={quotationPpnPct}
+              customers={customers}
             />
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setSaveDialogOpen(false)}>
-              Batal
+          ) : (
+            <EstimasiReport
+              formInfo={formInfo}
+              items={items}
+              costs={costs}
+              totalModalSparepart={totalModalSparepart}
+              discountAmt={discountAmt}
+              bankChargeIdr={bankChargeIdr}
+              packingCostIdr={packingCostIdr}
+              dutyTaxAmt={dutyTaxAmt}
+              airDhlIdr={airDhlIdr}
+              airDoorIdr={airDoorIdr}
+              seaResmiIdr={seaResmiIdr}
+              seaDoorIdr={seaDoorIdr}
+              localCostIdr={localCostIdr}
+              feeKurirIdr={feeKurirIdr}
+              otherCostsTotal={otherCostsTotal}
+              subTotal={subTotal}
+              investorAmt={investorAmt}
+              grandTotal={grandTotal}
+            />
+          )}
+          <DialogFooter className='print:hidden'>
+            <Button
+              variant='outline'
+              onClick={() => setReportDialogOpen(false)}
+            >
+              Tutup
             </Button>
-            <Button onClick={handleSave}>Simpan</Button>
+            <Button onClick={() => window.print()} className='gap-1.5'>
+              <Printer className='h-3.5 w-3.5' />
+              Print Report
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+function EstimasiReport({
+  formInfo,
+  items,
+  costs,
+  totalModalSparepart,
+  discountAmt,
+  bankChargeIdr,
+  packingCostIdr,
+  dutyTaxAmt,
+  airDhlIdr,
+  airDoorIdr,
+  seaResmiIdr,
+  seaDoorIdr,
+  localCostIdr,
+  feeKurirIdr,
+  otherCostsTotal,
+  subTotal,
+  investorAmt,
+  grandTotal,
+}: {
+  formInfo: FormInfo
+  items: LineItem[]
+  costs: CostConfig
+  totalModalSparepart: number
+  discountAmt: number
+  bankChargeIdr: number
+  packingCostIdr: number
+  dutyTaxAmt: number
+  airDhlIdr: number
+  airDoorIdr: number
+  seaResmiIdr: number
+  seaDoorIdr: number
+  localCostIdr: number
+  feeKurirIdr: number
+  otherCostsTotal: number
+  subTotal: number
+  investorAmt: number
+  grandTotal: number
+}) {
+  const reportDate = formInfo.tanggal
+    ? new Date(`${formInfo.tanggal}T00:00:00`).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : '-'
+
+  return (
+    <div className='space-y-5 bg-white p-2 text-slate-900 print:p-0'>
+      <div className='grid grid-cols-2 gap-4 border p-3 text-xs sm:grid-cols-4'>
+        <ReportMeta label='NO' value={formInfo.noQuo || '-'} />
+        <ReportMeta label='CUSTOMER ID' value={formInfo.pt || '-'} />
+        <ReportMeta label='DATE' value={reportDate} />
+        <ReportMeta label='SUPPLY LOCATION' value='JAKARTA' />
+      </div>
+      <div>
+        <div className='text-base font-bold'>{formInfo.pt || '-'}</div>
+        <div className='text-sm'>{formInfo.kapal || '-'}</div>
+      </div>
+      <table className='w-full border-collapse text-xs'>
+        <thead>
+          <tr className='border-y bg-slate-100'>
+            {[
+              'No',
+              'Kode IMPA',
+              'Description',
+              'Qty',
+              'Nama Toko',
+              'Unit Price',
+              'Amount',
+            ].map((header) => (
+              <th
+                key={header}
+                className='border-r px-1.5 py-1 text-left last:border-r-0'
+              >
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id} className='border-b'>
+              <td className='px-1.5 py-1'>{item.no}</td>
+              <td className='px-1.5 py-1'>{item.pn}</td>
+              <td className='px-1.5 py-1'>{item.description}</td>
+              <td className='px-1.5 py-1'>
+                {item.qty} {item.unit}
+              </td>
+              <td className='px-1.5 py-1'>{item.toko || '-'}</td>
+              <td className='px-1.5 py-1 text-right'>
+                {fmt(parseNum(item.unitPrice))}
+              </td>
+              <td className='px-1.5 py-1 text-right'>{fmt(item.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className='grid gap-5 text-xs md:grid-cols-2'>
+        <div className='border p-2'>
+          <div className='mb-1 text-sm font-bold'>RINGKASAN BIAYA:</div>
+          <ReportRow label='Sub Total Amount' value={totalModalSparepart} />
+          <ReportRow label='Discount' value={discountAmt} />
+          <ReportRow label='Bank Charge' value={bankChargeIdr} />
+          <ReportRow label='Packing Cost' value={packingCostIdr} />
+          <div className='mt-1 border-t pt-1 font-bold'>
+            <ReportRow
+              label='Total Delivery'
+              value={
+                dutyTaxAmt +
+                airDhlIdr +
+                airDoorIdr +
+                seaResmiIdr +
+                seaDoorIdr +
+                localCostIdr
+              }
+            />
+          </div>
+          <ReportRow label='Duty Tax' value={dutyTaxAmt} />
+          <ReportRow label='Air DHL' value={airDhlIdr} />
+          <ReportRow label='Air Door to Door' value={airDoorIdr} />
+          <ReportRow label='Sea Resmi' value={seaResmiIdr} />
+          <ReportRow label='Sea Door to Door' value={seaDoorIdr} />
+          <ReportRow label='Local Cost' value={localCostIdr} />
+          <ReportRow label='Fee Kurir' value={feeKurirIdr} />
+          <ReportRow label='HSI / Investor' value={investorAmt} />
+          <div className='mt-1 border-t pt-1 font-bold'>
+            <ReportRow label='Total Other Cost' value={otherCostsTotal} />
+          </div>
+          {costs.otherCosts.map((cost) => (
+            <ReportRow
+              key={cost.id}
+              label={cost.description || 'Cost lain'}
+              value={parseNum(cost.qty) * parseNum(cost.unitPrice)}
+            />
+          ))}
+        </div>
+        <div className='space-y-1 self-start'>
+          <ReportRow label='Sub Total' value={subTotal} />
+          <ReportRow label='Total Biaya Lain' value={otherCostsTotal} />
+          <div className='mt-1 bg-slate-100 p-2 text-sm font-bold'>
+            <ReportRow label='TOTAL MODAL (IDR)' value={grandTotal} />
+          </div>
+        </div>
+      </div>
+      <div className='border-t pt-3 text-right text-sm font-bold'>
+        PT. HALUAN DAYA NIAGA
+      </div>
+    </div>
+  )
+}
+
+function QuotationReport({
+  formInfo,
+  items,
+  quotationRange,
+  quotationDetails,
+  quotationSubtotal,
+  quotationDiscount,
+  quotationAfterDiscount,
+  quotationPpn,
+  quotationTotal,
+  quotationDiscountPct,
+  quotationPpnPct,
+  customers,
+}: {
+  formInfo: FormInfo
+  items: LineItem[]
+  quotationRange: string
+  quotationDetails: typeof defaultQuotationDetails
+  quotationSubtotal: number
+  quotationDiscount: number
+  quotationAfterDiscount: number
+  quotationPpn: number
+  quotationTotal: number
+  quotationDiscountPct: string
+  quotationPpnPct: string
+  customers: Customer[]
+}) {
+  const reportDate = formInfo.tanggal
+    ? new Date(`${formInfo.tanggal}T00:00:00`).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : '-'
+
+  const customer = customers.find((c) => c.pt === formInfo.pt)
+
+  return (
+    <div className='space-y-5 bg-white p-2 text-slate-900 print:p-0'>
+      <div className='flex items-start justify-between border-b pb-3'>
+        <div>
+          <div className='text-2xl font-bold text-sky-700'>
+            HALUAN <span className='text-green-600'>DAYA NIAGA</span>, PT.
+          </div>
+          <div className='text-xs font-medium text-green-600'>
+            Marine - Oil & Gas - Mining Services
+          </div>
+          <div className='mt-1 text-[10px] tracking-[0.25em] text-slate-500'>
+            NPWP: 07.312.145.3-502.000
+          </div>
+        </div>
+        <img
+          src='/images/logotok.png'
+          alt='Haluan Daya Niaga'
+          className='h-16 w-16 object-contain'
+        />
+      </div>
+      <div className='flex justify-between gap-4 text-[10px] leading-tight'>
+        <div>
+          <div>Ged. One Pacific Place, Level 11-SCBD</div>
+          <div>Jl. Jend. Sudirman Kav. 52-53, Jakarta 12190</div>
+          <div>Ph./Fax. 021-22757897-7538093</div>
+          <div>Email: sales@haluan.id / haluan.group@yahoo.co.id</div>
+          <div>Website: www.haluan.id</div>
+        </div>
+        <div className='text-right'>
+          <div className='font-bold'>Workshop:</div>
+          <div>Cinere Residence H1 No. 5</div>
+          <div>Depok Meruyung Jawa Barat 16515</div>
+        </div>
+      </div>
+      <div className='py-2 text-center'>
+        <div className='mx-auto max-w-xs border-b pb-2 text-3xl font-bold tracking-wider text-red-700'>
+          QUOTATION
+        </div>
+      </div>
+      <div className='grid grid-cols-2 gap-5 text-xs sm:grid-cols-[1fr_320px]'>
+        <div>
+          <div className='font-bold'>{formInfo.pt || '-'}</div>
+          <div>{formInfo.noRfs || formInfo.noQuo || '-'}</div>
+          <div>{formInfo.kapal || '-'}</div>
+          <div>Attn: {customer?.kontak || '-'}</div>
+        </div>
+        <div className='grid grid-cols-[115px_1fr] gap-y-1'>
+          <span className='font-bold'>NO</span>
+          <span>: {formInfo.noQuo || '-'}</span>
+          <span className='font-bold'>CUSTOMER ID</span>
+          <span>: {formInfo.pt || '-'}</span>
+          <span className='font-bold'>DATE</span>
+          <span>: {reportDate}</span>
+          <span className='font-bold'>PAGE</span>
+          <span>: 1</span>
+          <span className='font-bold'>SUPPLY LOCATION</span>
+          <span>: {formInfo.supplyLocation || '-'}</span>
+        </div>
+      </div>
+      <table className='w-full border-collapse text-xs'>
+        <thead>
+          <tr className='border-y border-slate-400 bg-slate-100'>
+            {[
+              'No',
+              'CODE',
+              'Description',
+              'Quantity',
+              'Unit Price',
+              'Amount',
+            ].map((header) => (
+              <th
+                key={header}
+                className='border-r px-1.5 py-1 text-left last:border-r-0'
+              >
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const unitPrice = item.unitPriceQuo?.trim()
+              ? parseNum(item.unitPriceQuo)
+              : (parseNum(item.unitPrice) * parseNum(quotationRange)) / 100
+            return (
+              <tr key={item.id} className='border-b'>
+                <td className='px-1.5 py-1'>{item.no}</td>
+                <td className='px-1.5 py-1'>{item.pn}</td>
+                <td className='px-1.5 py-1'>{item.description}</td>
+                <td className='px-1.5 py-1'>
+                  {item.qty} {item.unit}
+                </td>
+                <td className='px-1.5 py-1 text-right'>
+                  {formatQuotationAmount(unitPrice)}
+                </td>
+                <td className='px-1.5 py-1 text-right'>
+                  {formatQuotationAmount(parseNum(item.qty) * unitPrice)}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <div className='grid gap-5 text-xs md:grid-cols-2'>
+        <div className='space-y-1 font-medium'>
+          <div className='font-bold'># Note</div>
+          <div className='whitespace-pre-line'>{quotationDetails.note}</div>
+          <ReportTextRow label='# Delivery' value={quotationDetails.delivery} />
+          <ReportTextRow label='# Price' value={quotationDetails.price} />
+          <ReportTextRow label='# Payment' value={quotationDetails.payment} />
+          <ReportTextRow
+            label='# Stock Validity'
+            value={quotationDetails.stockValidity}
+          />
+          <ReportTextRow
+            label='# Price Validity'
+            value={quotationDetails.priceValidity}
+          />
+        </div>
+        <div className='self-start'>
+          <ReportRow label='Sub Total' value={quotationSubtotal} />
+          <ReportRow label='Discount' value={-quotationDiscount} />
+          <ReportRow
+            label='Total after discount'
+            value={quotationAfterDiscount}
+          />
+          <ReportRow label={`PPN ${quotationPpnPct}%`} value={quotationPpn} />
+          <div className='mt-1 bg-slate-100 p-2 text-sm font-bold'>
+            <ReportRow
+              label='TOTAL QUOTATION MUST BE PAID (IDR)'
+              value={quotationTotal}
+            />
+          </div>
+        </div>
+      </div>
+      <div className='flex items-end justify-between border-t pt-4'>
+        <div>
+          <div className='mb-2 text-xs font-bold'>ASSOCIATION MEMBER:</div>
+          <div className='flex items-center gap-3'>
+            {['4.png', '5.png', '6.png'].map((image) => (
+              <img
+                key={image}
+                src={`/images/${image}`}
+                alt='Association member'
+                className='h-14 w-auto object-contain'
+              />
+            ))}
+          </div>
+        </div>
+        <div className='text-right text-sm font-bold'>
+          PT. HALUAN DAYA NIAGA<div className='mt-10 font-normal'>IRFAN</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReportTextRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className='flex gap-2'>
+      <span className='shrink-0 font-bold'>{label} :</span>
+      <span>{value}</span>
+    </div>
+  )
+}
+
+function ReportMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className='font-bold'>{label}</div>
+      <div>{value}</div>
+    </div>
+  )
+}
+
+function ReportRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className='flex justify-between gap-3 py-0.5'>
+      <span>{label} :</span>
+      <span className='text-right'>{formatQuotationAmount(value)}</span>
+    </div>
   )
 }
 
@@ -1992,7 +2624,7 @@ function CostSubRow({
   label,
   children,
 }: {
-  label: string
+  label: React.ReactNode
   children: React.ReactNode
 }) {
   const quotationMode = useContext(QuotationModeContext)

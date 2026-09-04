@@ -17,6 +17,7 @@ import {
 } from '@/lib/api/estimasi'
 import { getNetProfitEstimatePct } from '@/lib/profit'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Header } from '@/components/layout/header'
@@ -61,6 +63,9 @@ interface FormInfo {
   dept: string
   noQuo: string
   noRfs: string
+  sktd?: boolean
+  revisi?: string
+  supplyLocation?: string
 }
 
 interface CostConfig {
@@ -133,6 +138,9 @@ const defaultFormInfo: FormInfo = {
   dept: '',
   noQuo: '',
   noRfs: '',
+  sktd: false,
+  revisi: '0',
+  supplyLocation: '',
 }
 
 const defaultQuotationDetails = {
@@ -356,6 +364,7 @@ export function ModalEstimasi({
       return
     }
     try {
+      const status = quotationMode ? 'quotation' : 'modal_estimasi'
       const saveData = {
         judul: judulEstimasi,
         formInfo: quotationMode
@@ -370,6 +379,7 @@ export function ModalEstimasi({
           : formInfo,
         items,
         costs,
+        status,
       }
       const saved =
         quotationMode &&
@@ -763,88 +773,158 @@ export function ModalEstimasi({
                 />
               </div>
             )}
-            <div className='flex items-center gap-2'>
-              <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                No. Quo
-              </Label>
-              {quotationMode ? (
-                <>
+            {quotationMode ? (
+              <div className='col-span-full'>
+                {/* Row 1 - No. Quo, Range, Supply Location */}
+                <div className='mb-2 flex items-center gap-2 text-xs'>
+                  <div className='flex shrink-0 items-center gap-1'>
+                    <Label className='text-xs font-semibold whitespace-nowrap text-muted-foreground'>
+                      No. Quo
+                    </Label>
+                    <Input
+                      value={formInfo.noQuo}
+                      onChange={(e) => {
+                        updateInfo('noQuo', e.target.value)
+                        if (
+                          savedList.some(
+                            (estimasi) => estimasi.noQuo === e.target.value
+                          )
+                        ) {
+                          void handleLoadQuotation(e.target.value)
+                        }
+                      }}
+                      list='quotation-numbers'
+                      placeholder='Cari No. Quo...'
+                      disabled={loadingQuotation}
+                      className='h-8 w-36 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+                    />
+                    <datalist id='quotation-numbers'>
+                      {savedList
+                        .filter((estimasi) => estimasi.noQuo)
+                        .map((estimasi) => (
+                          <option key={estimasi.id} value={estimasi.noQuo} />
+                        ))}
+                    </datalist>
+                  </div>
+
+                  <div className='flex shrink-0 items-center gap-1'>
+                    <Label className='font-semibold whitespace-nowrap text-muted-foreground'>
+                      Range (%)
+                    </Label>
+                    <Input
+                      type='number'
+                      min='0'
+                      max='999'
+                      value={quotationRange}
+                      onChange={(e) =>
+                        setQuotationRange(e.target.value.slice(0, 3))
+                      }
+                      placeholder=''
+                      className='h-8 w-16 text-xs'
+                    />
+                  </div>
+
+                  <div className='flex shrink-0 items-center gap-1'>
+                    <Label className='font-semibold whitespace-nowrap text-muted-foreground'>
+                      Persentase Estimasi (%)
+                    </Label>
+                    <Input
+                      value={estimasiPct}
+                      readOnly
+                      className='h-8 w-20 text-xs text-muted-foreground'
+                    />
+                  </div>
+
+                  <div className='flex shrink-0 items-center gap-1'>
+                    <Label className='font-semibold whitespace-nowrap text-muted-foreground'>
+                      Supply Location
+                    </Label>
+                    <Input
+                      value={formInfo.supplyLocation || ''}
+                      onChange={(e) =>
+                        setFormInfo((prev) => ({
+                          ...prev,
+                          supplyLocation: e.target.value,
+                        }))
+                      }
+                      placeholder='Jakarta'
+                      className='h-8 w-28 text-xs'
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2 - SKTD dan Revisi */}
+                <div className='flex items-center gap-4 text-xs'>
+                  <label className='flex shrink-0 items-center gap-1'>
+                    <Checkbox
+                      checked={formInfo.sktd || false}
+                      onCheckedChange={(checked) =>
+                        setFormInfo((prev) => ({
+                          ...prev,
+                          sktd: checked === true,
+                        }))
+                      }
+                      aria-label='SKTD'
+                      className='h-4 w-4'
+                    />
+                    <span className='font-semibold text-muted-foreground'>
+                      SKTD
+                    </span>
+                  </label>
+
+                  <div className='flex shrink-0 items-center gap-2'>
+                    <span className='font-semibold whitespace-nowrap text-muted-foreground'>
+                      Revisi
+                    </span>
+                    <RadioGroup
+                      value={formInfo.revisi || '0'}
+                      onValueChange={(value) =>
+                        setFormInfo((prev) => ({
+                          ...prev,
+                          revisi: value,
+                        }))
+                      }
+                      className='flex items-center gap-1'
+                      aria-label='Revisi quotation'
+                    >
+                      {['0', '1', '2', '3'].map((value) => (
+                        <label
+                          key={value}
+                          className='flex items-center gap-1 text-xs'
+                        >
+                          <RadioGroupItem value={value} className='h-3 w-3' />
+                          <span>{value}</span>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className='flex items-center gap-2'>
+                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
+                    No. Quo
+                  </Label>
                   <Input
                     value={formInfo.noQuo}
-                    onChange={(e) => {
-                      updateInfo('noQuo', e.target.value)
-                      if (
-                        savedList.some(
-                          (estimasi) => estimasi.noQuo === e.target.value
-                        )
-                      ) {
-                        void handleLoadQuotation(e.target.value)
-                      }
-                    }}
-                    list='quotation-numbers'
-                    placeholder='Cari No. Quo...'
-                    disabled={loadingQuotation}
-                    className='h-8 flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+                    onChange={(e) => updateInfo('noQuo', e.target.value)}
+                    placeholder='Nomor quotation'
+                    className='h-8 flex-1 text-xs'
                   />
-                  <datalist id='quotation-numbers'>
-                    {savedList
-                      .filter((estimasi) => estimasi.noQuo)
-                      .map((estimasi) => (
-                        <option key={estimasi.id} value={estimasi.noQuo} />
-                      ))}
-                  </datalist>
-                </>
-              ) : (
-                <Input
-                  value={formInfo.noQuo}
-                  onChange={(e) => updateInfo('noQuo', e.target.value)}
-                  placeholder='Nomor quotation'
-                  className='h-8 flex-1 text-xs'
-                />
-              )}
-            </div>
-            {quotationMode && (
-              <div className='flex items-center gap-2'>
-                <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                  Range (%)
-                </Label>
-                <Input
-                  type='number'
-                  min='0'
-                  max='999'
-                  value={quotationRange}
-                  onChange={(e) =>
-                    setQuotationRange(e.target.value.slice(0, 3))
-                  }
-                  placeholder=''
-                  className='h-8 w-20 flex-none text-xs'
-                />
-                <Label className='w-24 shrink-0 text-xs font-semibold text-muted-foreground'>
-                  Persentase Estimasi (%)
-                </Label>
-                <Input
-                  type='number'
-                  step='0.01'
-                  value={estimasiPct}
-                  placeholder='0'
-                  readOnly
-                  aria-label='Nilai Net Profit estimasi berdasarkan No. Quo'
-                  className='h-8 w-20 flex-none text-xs'
-                />
-              </div>
-            )}
-            {!quotationMode && (
-              <div className='flex items-center gap-2'>
-                <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                  No. RFS
-                </Label>
-                <Input
-                  value={formInfo.noRfs}
-                  onChange={(e) => updateInfo('noRfs', e.target.value)}
-                  placeholder='Nomor RFS'
-                  className='h-8 flex-1 text-xs'
-                />
-              </div>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
+                    No. RFS
+                  </Label>
+                  <Input
+                    value={formInfo.noRfs}
+                    onChange={(e) => updateInfo('noRfs', e.target.value)}
+                    placeholder='Nomor RFS'
+                    className='h-8 flex-1 text-xs'
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
