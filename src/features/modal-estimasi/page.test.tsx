@@ -70,7 +70,6 @@ describe('ModalEstimasi quotation mode', () => {
         id: 1,
         noQuo: 'TEST-001',
         judul: 'TEST',
-        status: 'modal_estimasi',
         createdAt: '2026-09-02T00:00:00.000Z',
         updatedAt: '2026-09-02T00:00:00.000Z',
       },
@@ -79,7 +78,6 @@ describe('ModalEstimasi quotation mode', () => {
       id: 1,
       noQuo: 'TEST-001',
       judul: 'TEST',
-      status: 'modal_estimasi',
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',
       formInfo: {
@@ -99,22 +97,22 @@ describe('ModalEstimasi quotation mode', () => {
       },
     })
 
-    const { getByPlaceholderText, getByRole, getByText } =
-      await renderWithRouter(
-        <DirectionProvider>
-          <ThemeProvider>
-            <LayoutProvider>
-              <SearchProvider>
-                <SidebarProvider defaultOpen>
-                  <ModalEstimasi />
-                </SidebarProvider>
-              </SearchProvider>
-            </LayoutProvider>
-          </ThemeProvider>
-        </DirectionProvider>
-      )
+    const { getByRole, getByText } = await renderWithRouter(
+      <DirectionProvider>
+        <ThemeProvider>
+          <LayoutProvider>
+            <SearchProvider>
+              <SidebarProvider defaultOpen>
+                <ModalEstimasi />
+              </SidebarProvider>
+            </SearchProvider>
+          </LayoutProvider>
+        </ThemeProvider>
+      </DirectionProvider>
+    )
 
-    const input = getByPlaceholderText(/Search No. Quo/i)
+    const input = getByRole('textbox', { name: /Search No. Quo/i })
+    await new Promise((resolve) => setTimeout(resolve, 0))
     await input.fill('TEST-001')
 
     await expect
