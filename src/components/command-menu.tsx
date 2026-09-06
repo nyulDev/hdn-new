@@ -1,6 +1,7 @@
 import React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowRight, ChevronRight, Laptop, Moon, Sun } from 'lucide-react'
+import { useAuthStore } from '@/stores/auth-store'
 import { useSearch } from '@/context/search-provider'
 import { useTheme } from '@/context/theme-provider'
 import {
@@ -19,6 +20,18 @@ export function CommandMenu() {
   const navigate = useNavigate()
   const { setTheme } = useTheme()
   const { open, setOpen } = useSearch()
+  const { auth } = useAuthStore()
+  const isSuperAdmin =
+    auth.user?.role?.some((role) => role.toLowerCase() === 'superadmin') ??
+    false
+  const visibleNavGroups = sidebarData.navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => item.title !== 'Users' || isSuperAdmin
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
 
   const runCommand = React.useCallback(
     (command: () => unknown) => {
@@ -34,7 +47,7 @@ export function CommandMenu() {
       <CommandList>
         <ScrollArea type='hover' className='h-72 pe-1'>
           <CommandEmpty>No results found.</CommandEmpty>
-          {sidebarData.navGroups.map((group) => (
+          {visibleNavGroups.map((group) => (
             <CommandGroup key={group.title} heading={group.title}>
               {group.items.map((navItem, i) => {
                 if (navItem.url)

@@ -25,9 +25,11 @@ import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-p
 import { Route as ClerkAuthenticatedRouteRouteImport } from './routes/clerk/_authenticated/route'
 import { Route as ClerkauthRouteRouteImport } from './routes/clerk/(auth)/route'
 import { Route as AuthenticatedTtbRouteRouteImport } from './routes/_authenticated/ttb/route'
+import { Route as AuthenticatedSoaSatuanRouteRouteImport } from './routes/_authenticated/soa-satuan/route'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedQuotationRouteRouteImport } from './routes/_authenticated/quotation/route'
 import { Route as AuthenticatedProfitRouteRouteImport } from './routes/_authenticated/profit/route'
+import { Route as AuthenticatedPenjualanRouteRouteImport } from './routes/_authenticated/penjualan/route'
 import { Route as AuthenticatedInvoiceRouteRouteImport } from './routes/_authenticated/invoice/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
@@ -124,6 +126,12 @@ const AuthenticatedTtbRouteRoute = AuthenticatedTtbRouteRouteImport.update({
   path: '/ttb',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSoaSatuanRouteRoute =
+  AuthenticatedSoaSatuanRouteRouteImport.update({
+    id: '/soa-satuan',
+    path: '/soa-satuan',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsRouteRoute =
   AuthenticatedSettingsRouteRouteImport.update({
     id: '/settings',
@@ -140,6 +148,12 @@ const AuthenticatedProfitRouteRoute =
   AuthenticatedProfitRouteRouteImport.update({
     id: '/profit',
     path: '/profit',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPenjualanRouteRoute =
+  AuthenticatedPenjualanRouteRouteImport.update({
+    id: '/penjualan',
+    path: '/penjualan',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedInvoiceRouteRoute =
@@ -249,9 +263,11 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/invoice': typeof AuthenticatedInvoiceRouteRoute
+  '/penjualan': typeof AuthenticatedPenjualanRouteRoute
   '/profit': typeof AuthenticatedProfitRouteRoute
   '/quotation': typeof AuthenticatedQuotationRouteRoute
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/soa-satuan': typeof AuthenticatedSoaSatuanRouteRoute
   '/ttb': typeof AuthenticatedTtbRouteRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -284,8 +300,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/invoice': typeof AuthenticatedInvoiceRouteRoute
+  '/penjualan': typeof AuthenticatedPenjualanRouteRoute
   '/profit': typeof AuthenticatedProfitRouteRoute
   '/quotation': typeof AuthenticatedQuotationRouteRoute
+  '/soa-satuan': typeof AuthenticatedSoaSatuanRouteRoute
   '/ttb': typeof AuthenticatedTtbRouteRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -321,9 +339,11 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/clerk': typeof ClerkRouteRouteWithChildren
   '/_authenticated/invoice': typeof AuthenticatedInvoiceRouteRoute
+  '/_authenticated/penjualan': typeof AuthenticatedPenjualanRouteRoute
   '/_authenticated/profit': typeof AuthenticatedProfitRouteRoute
   '/_authenticated/quotation': typeof AuthenticatedQuotationRouteRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/_authenticated/soa-satuan': typeof AuthenticatedSoaSatuanRouteRoute
   '/_authenticated/ttb': typeof AuthenticatedTtbRouteRoute
   '/clerk/(auth)': typeof ClerkauthRouteRouteWithChildren
   '/clerk/_authenticated': typeof ClerkAuthenticatedRouteRouteWithChildren
@@ -362,9 +382,11 @@ export interface FileRouteTypes {
     | '/'
     | '/clerk'
     | '/invoice'
+    | '/penjualan'
     | '/profit'
     | '/quotation'
     | '/settings'
+    | '/soa-satuan'
     | '/ttb'
     | '/forgot-password'
     | '/otp'
@@ -397,8 +419,10 @@ export interface FileRouteTypes {
   to:
     | '/clerk'
     | '/invoice'
+    | '/penjualan'
     | '/profit'
     | '/quotation'
+    | '/soa-satuan'
     | '/ttb'
     | '/forgot-password'
     | '/otp'
@@ -433,9 +457,11 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/clerk'
     | '/_authenticated/invoice'
+    | '/_authenticated/penjualan'
     | '/_authenticated/profit'
     | '/_authenticated/quotation'
     | '/_authenticated/settings'
+    | '/_authenticated/soa-satuan'
     | '/_authenticated/ttb'
     | '/clerk/(auth)'
     | '/clerk/_authenticated'
@@ -598,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTtbRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/soa-satuan': {
+      id: '/_authenticated/soa-satuan'
+      path: '/soa-satuan'
+      fullPath: '/soa-satuan'
+      preLoaderRoute: typeof AuthenticatedSoaSatuanRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -617,6 +650,13 @@ declare module '@tanstack/react-router' {
       path: '/profit'
       fullPath: '/profit'
       preLoaderRoute: typeof AuthenticatedProfitRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/penjualan': {
+      id: '/_authenticated/penjualan'
+      path: '/penjualan'
+      fullPath: '/penjualan'
+      preLoaderRoute: typeof AuthenticatedPenjualanRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/invoice': {
@@ -773,9 +813,11 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedInvoiceRouteRoute: typeof AuthenticatedInvoiceRouteRoute
+  AuthenticatedPenjualanRouteRoute: typeof AuthenticatedPenjualanRouteRoute
   AuthenticatedProfitRouteRoute: typeof AuthenticatedProfitRouteRoute
   AuthenticatedQuotationRouteRoute: typeof AuthenticatedQuotationRouteRoute
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
+  AuthenticatedSoaSatuanRouteRoute: typeof AuthenticatedSoaSatuanRouteRoute
   AuthenticatedTtbRouteRoute: typeof AuthenticatedTtbRouteRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
@@ -791,9 +833,11 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInvoiceRouteRoute: AuthenticatedInvoiceRouteRoute,
+  AuthenticatedPenjualanRouteRoute: AuthenticatedPenjualanRouteRoute,
   AuthenticatedProfitRouteRoute: AuthenticatedProfitRouteRoute,
   AuthenticatedQuotationRouteRoute: AuthenticatedQuotationRouteRoute,
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
+  AuthenticatedSoaSatuanRouteRoute: AuthenticatedSoaSatuanRouteRoute,
   AuthenticatedTtbRouteRoute: AuthenticatedTtbRouteRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,

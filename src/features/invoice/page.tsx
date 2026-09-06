@@ -40,6 +40,7 @@ type InvoiceRow = {
   remainingQty: number
   pn: string
   description: string
+  unit: string
   qty: number
   unitPrice: number
   amount: number
@@ -48,6 +49,7 @@ type InvoiceRow = {
 export function InvoicePage() {
   const [noQuoInput, setNoQuoInput] = useState('')
   const [noPo, setNoPo] = useState('')
+  const [location, setLocation] = useState('')
   const [loading, setLoading] = useState(false)
   const [quotationList, setQuotationList] = useState<
     { id: number; noQuo: string }[]
@@ -98,9 +100,11 @@ export function InvoicePage() {
       setLoadedInvoice(data)
       setSelectedQuantities({})
       setNoPo(data.formInfo?.noPo ?? data.formInfo?.noPO ?? '')
+      setLocation(data.formInfo?.supplyLocation || 'PLTU Suralaya')
       setNoQuoInput(data.formInfo?.noQuo ?? noQuo)
     } catch (error) {
       setLoadedInvoice(null)
+      setLocation('')
       alert('Gagal menarik data quotation: ' + (error as Error).message)
     } finally {
       setLoading(false)
@@ -155,6 +159,7 @@ export function InvoicePage() {
         remainingQty,
         pn: item?.pn || '-',
         description: item?.description || item?.nama || item?.name || 'Item',
+        unit: item?.unit || item?.satuan || '-',
         qty,
         unitPrice,
         amount,
@@ -166,7 +171,7 @@ export function InvoicePage() {
   const discount = Number(loadedInvoice?.costs?.discountPct ?? 0)
   const discountAmount = subtotal * (discount / 100)
   const totalAfterDiscount = subtotal - discountAmount
-  const ppnPct = Number(loadedInvoice?.formInfo?.quotationPpnPct ?? 11)
+  const ppnPct = Number(loadedInvoice?.formInfo?.quotationPpnPct ?? 12)
   const ppn = totalAfterDiscount * (ppnPct / 100)
   const totalInvoice = totalAfterDiscount + ppn
   const invoiceNo = loadedInvoice
@@ -203,13 +208,18 @@ export function InvoicePage() {
         customerName: loadedInvoice.formInfo?.pt ?? '',
         amount: totalInvoice,
         status: 'belum_dibayar',
-        formInfo: { ...(loadedInvoice.formInfo ?? {}), noPo },
+        formInfo: {
+          ...(loadedInvoice.formInfo ?? {}),
+          noPo,
+          supplyLocation: location,
+        },
         items: invoiceRows
           .filter((row) => row.qty > 0)
           .map((row) => ({
             ...quotationItems[row.id - 1],
             itemKey: row.itemKey,
             description: row.description,
+            unit: row.unit,
             qty: row.qty,
           })),
         costs: loadedInvoice.costs ?? {},
@@ -367,7 +377,15 @@ export function InvoicePage() {
                 <span>: 1</span>
                 <span className='font-semibold'>LOCATION</span>
                 <span>
-                  : {loadedInvoice.formInfo?.supplyLocation || 'PLTU Suralaya'}
+                  :{' '}
+                  <Input
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    placeholder='Masukkan lokasi'
+                    className='inline-flex h-8 w-40 print:hidden'
+                    aria-label='Lokasi invoice'
+                  />
+                  <span className='hidden print:inline'>{location || '-'}</span>
                 </span>
               </div>
             </div>
@@ -377,16 +395,19 @@ export function InvoicePage() {
             <table className='w-full border-collapse text-left text-sm'>
               <thead className='bg-slate-200 text-slate-800'>
                 <tr>
-                  <th className='border border-slate-300 px-3 py-2 print:hidden'>
+                  <th className='w-12 border border-slate-300 px-1 py-2 print:hidden'>
                     Pilih
                   </th>
-                  <th className='border border-slate-300 px-3 py-2'>No</th>
+                  <th className='w-10 border border-slate-300 px-1 py-2'>No</th>
                   <th className='border border-slate-300 px-3 py-2'>Code</th>
-                  <th className='border border-slate-300 px-3 py-2'>
+                  <th className='min-w-64 border border-slate-300 px-3 py-2'>
                     Description
                   </th>
-                  <th className='border border-slate-300 px-3 py-2 text-right'>
+                  <th className='w-24 border border-slate-300 px-1 py-2 text-right'>
                     Quantity
+                  </th>
+                  <th className='w-20 border border-slate-300 px-1 py-2'>
+                    Satuan
                   </th>
                   <th className='border border-slate-300 px-3 py-2 text-right'>
                     Unit Price
@@ -403,7 +424,7 @@ export function InvoicePage() {
                       key={row.id}
                       className={`align-top ${row.qty === 0 ? 'print:hidden' : ''}`}
                     >
-                      <td className='border border-slate-300 px-3 py-2 text-center print:hidden'>
+                      <td className='w-12 border border-slate-300 px-1 py-2 text-center print:hidden'>
                         <Checkbox
                           checked={row.qty > 0}
                           disabled={row.remainingQty === 0}
@@ -413,16 +434,16 @@ export function InvoicePage() {
                           aria-label={`Pilih ${row.description}`}
                         />
                       </td>
-                      <td className='border border-slate-300 px-3 py-2'>
+                      <td className='w-10 border border-slate-300 px-1 py-2'>
                         {row.id}
                       </td>
                       <td className='border border-slate-300 px-3 py-2'>
                         {row.pn}
                       </td>
-                      <td className='border border-slate-300 px-3 py-2'>
+                      <td className='min-w-64 border border-slate-300 px-3 py-2'>
                         {row.description}
                       </td>
-                      <td className='border border-slate-300 px-3 py-2 text-right'>
+                      <td className='w-24 border border-slate-300 px-1 py-2 text-right'>
                         <Input
                           type='number'
                           min={0}
@@ -435,12 +456,15 @@ export function InvoicePage() {
                               event.target.value
                             )
                           }
-                          className='ml-auto h-9 w-24 text-right'
+                          className='ml-auto h-9 w-20 text-right'
                           aria-label={`Qty ${row.description}`}
                         />
                         <span className='mt-1 block text-xs text-slate-500'>
                           Sisa: {row.remainingQty} / {row.quotationQty}
                         </span>
+                      </td>
+                      <td className='w-20 border border-slate-300 px-1 py-2'>
+                        {row.unit}
                       </td>
                       <td className='border border-slate-300 px-3 py-2 text-right'>
                         {formatCurrency(row.unitPrice)}
@@ -453,7 +477,7 @@ export function InvoicePage() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className='border border-slate-300 px-3 py-6 text-center text-slate-500'
                     >
                       Tidak ada item untuk invoice ini

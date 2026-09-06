@@ -5,6 +5,9 @@ import {
   FileText,
   ReceiptText,
   TrendingUp,
+  ChartNoAxesCombined,
+  ClipboardClock,
+  Users,
   AudioWaveform,
   Command,
   GalleryVerticalEnd,
@@ -78,7 +81,6 @@ export const sidebarData: SidebarData = {
           url: '/ttb',
           icon: FileText,
         },
-
         /*
         {
           title: 'Tasks',
@@ -95,11 +97,6 @@ export const sidebarData: SidebarData = {
           url: '/chats',
           badge: '3',
           icon: MessagesSquare,
-        },
-        {
-          title: 'Users',
-          url: '/users',
-          icon: Users,
         },
         {
           title: 'Secured by Clerk',
@@ -120,6 +117,31 @@ export const sidebarData: SidebarData = {
           ],
         },
         */
+      ],
+    },
+    {
+      title: 'SOA',
+      items: [
+        {
+          title: 'Penjualan',
+          url: '/penjualan',
+          icon: ChartNoAxesCombined,
+        },
+        {
+          title: 'SOA Satuan',
+          url: '/soa-satuan',
+          icon: ClipboardClock,
+        },
+      ],
+    },
+    {
+      title: 'ADMIN',
+      items: [
+        {
+          title: 'Users',
+          url: '/users',
+          icon: Users,
+        },
       ],
     },
     /*

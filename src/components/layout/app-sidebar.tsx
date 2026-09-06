@@ -16,6 +16,17 @@ import { TeamSwitcher } from './team-switcher'
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
   const { auth } = useAuthStore()
+  const isSuperAdmin =
+    auth.user?.role?.some((role) => role.toLowerCase() === 'superadmin') ??
+    false
+  const visibleNavGroups = sidebarData.navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => item.title !== 'Users' || isSuperAdmin
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
   const displayName = auth.user
     ? `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim() ||
       auth.user.username ||
@@ -33,7 +44,7 @@ export function AppSidebar() {
         {/* <AppTitle /> */}
       </SidebarHeader>
       <SidebarContent>
-        {sidebarData.navGroups.map((props) => (
+        {visibleNavGroups.map((props) => (
           <NavGroup key={props.title} {...props} />
         ))}
       </SidebarContent>

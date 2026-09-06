@@ -1,0 +1,245 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Search as SearchIcon } from 'lucide-react'
+import { getInvoices, type InvoiceRecord } from '@/lib/api/invoice'
+import {
+  getActualModalHsiAmount,
+  getActualModalSubtotal,
+  getModalSubtotal,
+  getQuotationAfterDiscount,
+  parseQuotationNumber,
+} from '@/lib/profit'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { ThemeSwitch } from '@/components/theme-switch'
+
+const formatCurrency = (value: number) =>
+  `Rp ${Math.round(value).toLocaleString('id-ID')}`
+
+const formatDate = (value: unknown) => {
+  if (!value) return '-'
+  const date = new Date(String(value))
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleDateString('id-ID')
+}
+
+const getInvoiceNumber = (invoice: InvoiceRecord) => {
+  const rfsNumber = invoice.formInfo?.noRfs ?? invoice.formInfo?.noRFS
+  if (rfsNumber) return String(rfsNumber)
+
+  const storedNumber =
+    invoice.formInfo?.noInvoice ?? invoice.formInfo?.invoiceNo
+  if (storedNumber) return String(storedNumber)
+
+  const noQuo = String(
+    invoice.formInfo?.noQuo ?? invoice.noQuo ?? 'XXX'
+  ).replace(/\s+/g, '')
+  const year =
+    new Date(invoice.createdAt).getFullYear() || new Date().getFullYear()
+  return `${noQuo}-INV-${year}`
+}
+
+type SalesRow = {
+  id: number
+  date: string
+  customer: string
+  invoiceNumber: string
+  totalAfterDiscount: number
+  ppn: number
+  modalRequested: number
+  actualPurchase: number
+  grossProfit: number
+  marketingFee: number
+  hsiShare: number
+  socialAid: number
+  netProfit: number
+}
+
+const toSalesRow = (invoice: InvoiceRecord, index: number): SalesRow => {
+  const totalAfterDiscount = getQuotationAfterDiscount(invoice)
+  const ppnPct = parseQuotationNumber(invoice.formInfo?.quotationPpnPct ?? 12)
+  const ppn = totalAfterDiscount * (ppnPct / 100)
+  const modalRequested = getModalSubtotal(invoice)
+  const actualPurchase = getActualModalSubtotal(invoice)
+  const grossProfit = totalAfterDiscount - actualPurchase
+  const marketingFee = Math.max(grossProfit, 0) * 0.1
+  const hsiShare = getActualModalHsiAmount(invoice)
+  const socialAid = parseQuotationNumber(
+    invoice.formInfo?.bansosAmount ?? invoice.costs?.bansosAmount
+  )
+  const netProfit = grossProfit - marketingFee - hsiShare - socialAid
+
+  return {
+    id: index + 1,
+    date: String(invoice.formInfo?.tanggal ?? invoice.createdAt),
+    customer: String(
+      invoice.formInfo?.pt ?? invoice.customerName ?? invoice.judul ?? '-'
+    ),
+    invoiceNumber: getInvoiceNumber(invoice),
+    totalAfterDiscount,
+    ppn,
+    modalRequested,
+    actualPurchase,
+    grossProfit,
+    marketingFee,
+    hsiShare,
+    socialAid,
+    netProfit,
+  }
+}
+
+export function Penjualan() {
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getInvoices()
+      .then(setInvoices)
+      .catch(() => setError('Data penjualan belum dapat dimuat.'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const rows = useMemo(
+    () =>
+      invoices.map(toSalesRow).filter((row) => {
+        const query = search.trim().toLowerCase()
+        if (!query) return true
+        return `${row.customer} ${row.invoiceNumber} ${row.date}`
+          .toLowerCase()
+          .includes(query)
+      }),
+    [invoices, search]
+  )
+
+  return (
+    <>
+      <Header>
+        <ThemeSwitch />
+        <ProfileDropdown />
+      </Header>
+      <Main fluid className='px-2 py-6 sm:px-3 lg:px-4'>
+        <div className='mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-start'>
+          <div>
+            <h1 className='text-2xl font-bold tracking-tight'>
+              Report Penjualan
+            </h1>
+            <p className='mt-0.5 text-sm text-muted-foreground'>
+              Total {rows.length} records ({rows.length} total)
+            </p>
+          </div>
+          <label className='relative block w-full sm:w-84'>
+            <SearchIcon className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground' />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder='Cari customer atau no. invoice...'
+              aria-label='Cari customer atau nomor invoice'
+              className='h-10 w-full rounded-lg border bg-background pr-3 pl-9 text-sm shadow-sm transition outline-none focus:border-ring focus:ring-2 focus:ring-ring/20'
+            />
+          </label>
+        </div>
+
+        <div className='overflow-x-auto rounded-lg border bg-background shadow-sm'>
+          <table className='w-full min-w-385 border-collapse text-sm'>
+            <thead>
+              <tr className='border-b bg-muted/30 text-left font-semibold'>
+                <th className='w-12 px-2 py-4'>No</th>
+                <th className='w-28 px-2 py-4'>Tanggal</th>
+                <th className='w-44 px-2 py-4'>Customer</th>
+                <th className='w-56 px-2 py-4'>No. Invoice</th>
+                <th className='px-2 py-4 text-right'>Total After Disc.</th>
+                <th className='px-2 py-4 text-right'>PPN</th>
+                <th className='px-2 py-4 text-right'>Pengajuan Modal</th>
+                <th className='px-2 py-4 text-right'>Pembelian Aktual</th>
+                <th className='px-2 py-4 text-right'>Gross Profit</th>
+                <th className='px-2 py-4 text-right'>Marketing Fee (10%)</th>
+                <th className='px-2 py-4 text-right'>Bagi Hasil HSI (8%)</th>
+                <th className='px-2 py-4 text-right'>Bansos (5%)</th>
+                <th className='px-2 py-4 text-right text-red-600'>
+                  Net Profit
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={13}
+                    className='px-4 py-10 text-center text-muted-foreground'
+                  >
+                    Memuat data penjualan...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td
+                    colSpan={13}
+                    className='px-4 py-10 text-center text-destructive'
+                  >
+                    {error}
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={13}
+                    className='px-4 py-10 text-center text-muted-foreground'
+                  >
+                    Belum ada data penjualan.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <tr
+                    key={row.invoiceNumber}
+                    className='border-b last:border-0 hover:bg-muted/20'
+                  >
+                    <td className='px-2 py-4'>{row.id}</td>
+                    <td className='px-2 py-4 whitespace-nowrap'>
+                      {formatDate(row.date)}
+                    </td>
+                    <td className='px-2 py-4 font-medium whitespace-normal'>
+                      {row.customer}
+                    </td>
+                    <td className='px-2 py-4 whitespace-nowrap'>
+                      {row.invoiceNumber}
+                    </td>
+                    <td className='px-2 py-4 text-right whitespace-nowrap'>
+                      {formatCurrency(row.totalAfterDiscount)}
+                    </td>
+                    <td className='px-2 py-4 text-right whitespace-nowrap'>
+                      {formatCurrency(row.ppn)}
+                    </td>
+                    <td className='px-2 py-4 text-right whitespace-nowrap'>
+                      {formatCurrency(row.modalRequested)}
+                    </td>
+                    <td className='px-2 py-4 text-right whitespace-nowrap'>
+                      {formatCurrency(row.actualPurchase)}
+                    </td>
+                    <td className='px-2 py-4 text-right font-semibold whitespace-nowrap'>
+                      {formatCurrency(row.grossProfit)}
+                    </td>
+                    <td className='px-2 py-4 text-right font-semibold whitespace-nowrap'>
+                      {formatCurrency(row.marketingFee)}
+                    </td>
+                    <td className='px-2 py-4 text-right font-semibold whitespace-nowrap'>
+                      {formatCurrency(row.hsiShare)}
+                    </td>
+                    <td className='px-2 py-4 text-right font-semibold whitespace-nowrap'>
+                      {formatCurrency(row.socialAid)}
+                    </td>
+                    <td className='px-2 py-4 text-right font-semibold whitespace-nowrap text-red-600'>
+                      {formatCurrency(row.netProfit)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Main>
+    </>
+  )
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Printer, Save } from 'lucide-react'
+import { CheckCircle2, Printer, Save } from 'lucide-react'
 import { getEstimasiByNoQuo, getEstimasiList } from '@/lib/api/estimasi'
 import { getInvoiceByNoQuo } from '@/lib/api/invoice'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,14 @@ const formatDate = (value: unknown) => {
       })
 }
 
+const toInputDate = (value: unknown) => {
+  if (!value) return new Date().toISOString().slice(0, 10)
+  const date = new Date(String(value))
+  return Number.isNaN(date.getTime())
+    ? String(value).slice(0, 10)
+    : date.toISOString().slice(0, 10)
+}
+
 export function TtbPage() {
   const [noQuoInput, setNoQuoInput] = useState('')
   const [quotationList, setQuotationList] = useState<
@@ -55,6 +63,8 @@ export function TtbPage() {
   const [quotation, setQuotation] = useState<TtbQuotation | null>(null)
   const [invoiceNoPo, setInvoiceNoPo] = useState('')
   const [invoiceNoRfs, setInvoiceNoRfs] = useState('')
+  const [ttbDate, setTtbDate] = useState('')
+  const [location, setLocation] = useState('')
   const [selectedQuantities, setSelectedQuantities] = useState<
     Record<string, number>
   >({})
@@ -97,14 +107,20 @@ export function TtbPage() {
           {
             quantities?: Record<string, number>
             notes?: Record<string, string>
+            date?: string
+            location?: string
           }
         >
         const draft = drafts[quotationNoQuo]
         setSelectedQuantities(draft?.quantities ?? {})
         setNotes(draft?.notes ?? {})
+        setTtbDate(draft?.date ?? toInputDate(data.formInfo?.tanggal))
+        setLocation(draft?.location ?? data.formInfo?.supplyLocation ?? '')
       } catch {
         setSelectedQuantities({})
         setNotes({})
+        setTtbDate(toInputDate(data.formInfo?.tanggal))
+        setLocation(data.formInfo?.supplyLocation ?? '')
       }
       setInvoiceNoPo(
         invoiceFormInfo.noPo ??
@@ -121,6 +137,8 @@ export function TtbPage() {
       setInvoiceNoRfs('')
       setSelectedQuantities({})
       setNotes({})
+      setTtbDate('')
+      setLocation('')
       alert('Gagal menarik data quotation: ' + (error as Error).message)
     } finally {
       setLoading(false)
@@ -155,7 +173,7 @@ export function TtbPage() {
       code: item.code || item.pn || '-',
       quotationQty,
       qty,
-      unit: item.unit || '',
+      unit: item.unit || item.satuan || '',
       note: notes[itemKey] ?? item.note ?? '',
     }
   })
@@ -190,6 +208,8 @@ export function TtbPage() {
       drafts[quotationNoQuo] = {
         quantities: selectedQuantities,
         notes,
+        date: ttbDate,
+        location,
       }
       window.localStorage.setItem(ttbStorageKey, JSON.stringify(drafts))
       alert('TTB berhasil disimpan.')
@@ -246,7 +266,7 @@ export function TtbPage() {
       </Card>
 
       {quotation ? (
-        <div className='rounded-xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:border-0 print:p-0 print:shadow-none'>
+        <div className='mx-auto max-w-7xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:border-0 print:p-0 print:shadow-none'>
           <div className='mb-4 flex justify-end gap-2 print:hidden'>
             <Button onClick={handleSaveTtb}>
               <Save className='h-4 w-4' />
@@ -258,8 +278,8 @@ export function TtbPage() {
             </Button>
           </div>
 
-          <div className='flex items-start justify-between border-b border-slate-200 pb-4'>
-            <div>
+          <div className='relative flex items-start justify-center border-b border-slate-200 pb-4'>
+            <div className='text-center'>
               <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
                 <span className='text-[#21ae43]'>H</span>
                 <span className='text-[#004d91]'>ALUAN </span>
@@ -278,11 +298,11 @@ export function TtbPage() {
             <img
               src='/images/logotok.png'
               alt='Logo Haluan Daya Niaga'
-              className='h-20 w-20 object-contain'
+              className='absolute top-0 right-0 h-24 w-24 object-contain'
             />
           </div>
 
-          <div className='grid gap-6 border-b border-slate-300 py-4 text-xs text-slate-600 md:grid-cols-2'>
+          <div className='grid gap-6 border-b border-slate-300 py-4 text-xs text-slate-600 md:grid-cols-[1fr_1fr_365px]'>
             <div>
               <p className='font-semibold text-slate-900'>
                 Gd. One Pacific Place, Level 11-SCBD
@@ -292,52 +312,70 @@ export function TtbPage() {
               <p>Email : sales@haluan.id / haluan.group@yahoo.co.id</p>
               <p>Website : www.haluan-group.net</p>
             </div>
-            <div className='justify-self-end text-right'>
+            <div className='justify-self-center text-center'>
               <p className='font-semibold text-slate-900'>Workshop:</p>
               <p>Cinere Residence H1 No. 5</p>
               <p>Depok Regency Jawa Barat 16515</p>
             </div>
+            <div className='self-center border-2 border-slate-700 px-4 py-2 text-center'>
+              <h2 className='text-2xl font-black tracking-[0.08em] text-red-600 uppercase md:text-3xl'>
+                TANDA TERIMA BARANG
+              </h2>
+            </div>
           </div>
 
-          <div className='mx-auto mt-8 max-w-2xl border-b-2 border-slate-700 pb-3 text-center'>
-            <h2 className='text-3xl font-black tracking-[0.12em] text-red-600 uppercase md:text-4xl'>
-              TANDA TERIMA BARANG
-            </h2>
-          </div>
-
-          <div className='mt-6 grid max-w-2xl grid-cols-[90px_1fr] gap-x-4 gap-y-1 text-sm'>
-            <span className='font-semibold'>Tanggal</span>
-            <span>: {formatDate(formInfo.tanggal)}</span>
-            <span className='font-semibold'>PT</span>
-            <span>: {formInfo.pt || '-'}</span>
-            <span className='font-semibold'>Kapal</span>
-            <span>: {formInfo.kapal || '-'}</span>
-            <span className='font-semibold'>No. TTB</span>
-            <span>: {ttbNumber}</span>
-            <span className='font-semibold'>No. RFS</span>
-            <span>: {noRfs}</span>
-            <span className='font-semibold'>No. PO</span>
-            <span>: {invoiceNoPo || '-'}</span>
-            <span className='font-semibold'>Lokasi</span>
-            <span>: {formInfo.supplyLocation || '-'}</span>
+          <div className='mt-6 grid grid-cols-1 gap-4 text-sm md:grid-cols-[1fr_365px]'>
+            <div className='border border-slate-700 p-3'>
+              <p className='font-semibold'>Dikirimkan ke:</p>
+              <p className='mt-1 pl-12 font-semibold'>{formInfo.pt || '-'}</p>
+              <p className='pl-12'>{location || '-'}</p>
+              <p className='pl-12'>{formInfo.kapal || '-'}</p>
+              <p className='pl-12'>{noRfs}</p>
+            </div>
+            <div className='grid grid-cols-2 border border-slate-700 text-center'>
+              <div className='border-r border-slate-700 p-2'>
+                <p className='font-bold'>Tanggal</p>
+                <Input
+                  type='date'
+                  value={ttbDate}
+                  onChange={(event) => setTtbDate(event.target.value)}
+                  className='mt-1 h-7 w-full border-0 p-0 text-center text-xs print:hidden'
+                  aria-label='Tanggal TTB'
+                />
+                <span className='hidden text-xs print:inline'>
+                  {formatDate(ttbDate)}
+                </span>
+              </div>
+              <div className='p-2'>
+                <p className='font-bold'>No.</p>
+                <p className='mt-2 text-xs'>{ttbNumber}</p>
+              </div>
+              <div className='col-span-2 border-t border-slate-700 p-2 text-left'>
+                <span className='font-semibold'>No. PO:</span>{' '}
+                {invoiceNoPo || '-'}
+              </div>
+            </div>
           </div>
 
           <div className='mt-6 overflow-hidden border border-slate-200'>
             <table className='w-full border-collapse text-left text-xs'>
               <thead className='bg-slate-100 text-slate-800'>
                 <tr>
-                  <th className='border border-slate-200 px-3 py-2 print:hidden'>
+                  <th className='w-12 border border-slate-200 px-1 py-2 print:hidden'>
                     Pilih
                   </th>
-                  <th className='border border-slate-200 px-3 py-2'>No</th>
+                  <th className='w-10 border border-slate-200 px-1 py-2'>No</th>
                   <th className='border border-slate-200 px-3 py-2'>CODE</th>
-                  <th className='border border-slate-200 px-3 py-2'>
-                    Description
+                  <th className='min-w-64 border border-slate-200 px-3 py-2'>
+                    Uraian
                   </th>
-                  <th className='border border-slate-200 px-3 py-2 text-right'>
+                  <th className='w-24 border border-slate-200 px-1 py-2 text-right'>
                     Quantity
                   </th>
-                  <th className='border border-slate-200 px-3 py-2'>Notes</th>
+                  <th className='w-20 border border-slate-200 px-1 py-2'>
+                    Satuan
+                  </th>
+                  <th className='border border-slate-200 px-3 py-2'>Catatan</th>
                 </tr>
               </thead>
               <tbody>
@@ -347,7 +385,7 @@ export function TtbPage() {
                       key={row.id}
                       className={`align-top ${row.qty === 0 ? 'print:hidden' : ''}`}
                     >
-                      <td className='border border-slate-200 px-3 py-2 text-center print:hidden'>
+                      <td className='w-12 border border-slate-200 px-1 py-2 text-center print:hidden'>
                         <Checkbox
                           checked={row.qty > 0}
                           disabled={row.quotationQty === 0}
@@ -357,16 +395,16 @@ export function TtbPage() {
                           aria-label={`Pilih ${row.description}`}
                         />
                       </td>
-                      <td className='border border-slate-200 px-3 py-2'>
+                      <td className='w-10 border border-slate-200 px-1 py-2'>
                         {row.id}
                       </td>
                       <td className='border border-slate-200 px-3 py-2'>
                         {row.code}
                       </td>
-                      <td className='border border-slate-200 px-3 py-2'>
+                      <td className='min-w-64 border border-slate-200 px-3 py-2'>
                         {row.description}
                       </td>
-                      <td className='border border-slate-200 px-3 py-2 text-right'>
+                      <td className='w-24 border border-slate-200 px-1 py-2 text-right'>
                         <Input
                           type='number'
                           min={0}
@@ -379,12 +417,15 @@ export function TtbPage() {
                               event.target.value
                             )
                           }
-                          className='ml-auto h-8 w-24 text-right print:border-0'
+                          className='ml-auto h-8 w-20 text-right print:border-0'
                           aria-label={`Qty ${row.description}`}
                         />
                         <span className='mt-1 block text-xs text-slate-500 print:hidden'>
                           Maks: {row.quotationQty}
                         </span>
+                      </td>
+                      <td className='w-20 border border-slate-200 px-1 py-2'>
+                        {row.unit || '-'}
                       </td>
                       <td className='border border-slate-200 px-3 py-2'>
                         <Input
@@ -392,7 +433,7 @@ export function TtbPage() {
                           onChange={(event) =>
                             handleNoteChange(row.itemKey, event.target.value)
                           }
-                          placeholder='Notes'
+                          placeholder='Catatan'
                           className='h-8 min-w-32 print:border-0'
                           aria-label={`Notes ${row.description}`}
                         />
@@ -402,7 +443,7 @@ export function TtbPage() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className='border border-slate-200 px-3 py-6 text-center text-slate-500'
                     >
                       Tidak ada item untuk TTB ini
@@ -413,23 +454,39 @@ export function TtbPage() {
             </table>
           </div>
 
-          <div className='mt-8 flex items-end justify-between gap-8 border-t border-slate-200 pt-6'>
-            <div>
-              <p className='text-[10px] text-slate-500'>Quality Counts</p>
-              <div className='mt-2 flex items-center gap-3'>
-                {['4.png', '5.png', '6.png'].map((fileName) => (
-                  <img
-                    key={fileName}
-                    src={`/images/${fileName}`}
-                    alt={`Association member ${fileName.replace('.png', '')}`}
-                    className='h-14 w-auto object-contain'
-                  />
-                ))}
-              </div>
-            </div>
-            <div className='min-w-48 text-center text-sm'>
+          <div className='mt-8 grid gap-8 border-t border-slate-200 pt-6 md:grid-cols-[220px_1fr_300px] md:items-end'>
+            <div className='min-w-48 text-left text-sm'>
               <p className='font-semibold'>Diterima Oleh,</p>
-              <div className='mt-14 border-b border-slate-700' />
+              <div className='mt-14 w-24 border-b border-slate-700' />
+            </div>
+            <div className='flex items-center justify-center gap-6'>
+              <img
+                src='/images/4nbg.png'
+                alt='Logo 4'
+                className='h-24 w-auto object-contain'
+              />
+              <img
+                src='/images/51.png'
+                alt='Logo 51'
+                className='h-24 w-auto object-contain'
+              />
+            </div>
+            <div className='overflow-hidden border-2 border-slate-800'>
+              <div className='bg-green-600 px-4 py-2 text-center text-3xl font-black text-white'>
+                CHECKED
+              </div>
+              <div className='space-y-4 bg-slate-50 p-3 text-green-600'>
+                <div className='flex items-center gap-2'>
+                  <CheckCircle2 className='h-5 w-5 shrink-0' />
+                  <span className='font-medium'>BY</span>
+                  <span className='h-5 flex-1 border-b-2 border-green-500' />
+                </div>
+                <div className='flex items-center gap-2'>
+                  <CheckCircle2 className='h-5 w-5 shrink-0' />
+                  <span className='font-medium'>DATE</span>
+                  <span className='h-5 flex-1 border-b-2 border-green-500' />
+                </div>
+              </div>
             </div>
           </div>
         </div>

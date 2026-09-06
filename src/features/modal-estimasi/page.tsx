@@ -325,7 +325,7 @@ export function ModalEstimasi({
   const [quotationRange, setQuotationRange] = useState('')
   const [estimasiPct, setEstimasiPct] = useState('')
   const [quotationDiscountPct, setQuotationDiscountPct] = useState('10')
-  const [quotationPpnPct, setQuotationPpnPct] = useState('11')
+  const [quotationPpnPct, setQuotationPpnPct] = useState('12')
   const [showQuotationTable, setShowQuotationTable] = useState(!quotationMode)
   const [quotationDetails, setQuotationDetails] = useState(
     defaultQuotationDetails
@@ -413,7 +413,7 @@ export function ModalEstimasi({
       setQuotationDiscountPct(
         String(loadedFormInfo.quotationDiscountPct ?? '10')
       )
-      setQuotationPpnPct(String(loadedFormInfo.quotationPpnPct ?? '11'))
+      setQuotationPpnPct(String(loadedFormInfo.quotationPpnPct ?? '12'))
       setItems(data.items || [])
       setCosts({
         ...defaultCosts,
@@ -628,7 +628,7 @@ export function ModalEstimasi({
     setQuotationRange('')
     setEstimasiPct('')
     setQuotationDiscountPct('10')
-    setQuotationPpnPct('11')
+    setQuotationPpnPct('12')
     setQuotationDetails(defaultQuotationDetails)
     setShowQuotationTable(!quotationMode)
   }, [quotationMode])
@@ -931,7 +931,7 @@ export function ModalEstimasi({
               )}
               {quotationMode && (
                 <div className='col-span-full'>
-                  {/* Satu baris: No. Quo | Range (%) | Supply Location | SKTD | Revisi */}
+                  {/* Satu baris: No. Quo | Range (%) | SKTD | Revisi */}
                   <div className='flex flex-wrap items-center gap-x-6 gap-y-2'>
                     <div className='flex items-center gap-2'>
                       <Label className='w-16 shrink-0 text-xs font-semibold text-muted-foreground'>
@@ -988,20 +988,6 @@ export function ModalEstimasi({
                         value={estimasiPct}
                         readOnly
                         className='h-8 w-20 flex-none bg-muted/30 text-xs text-muted-foreground'
-                      />
-                    </div>
-
-                    <div className='flex items-center gap-2'>
-                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
-                        Supply Location
-                      </Label>
-                      <Input
-                        value={formInfo.supplyLocation}
-                        onChange={(e) =>
-                          updateInfo('supplyLocation', e.target.value)
-                        }
-                        placeholder='Jakarta'
-                        className='h-8 w-[100px] flex-none text-xs'
                       />
                     </div>
 
@@ -2374,7 +2360,6 @@ function QuotationReport({
   quotationAfterDiscount,
   quotationPpn,
   quotationTotal,
-  quotationDiscountPct,
   quotationPpnPct,
   customers,
 }: {
@@ -2387,7 +2372,6 @@ function QuotationReport({
   quotationAfterDiscount: number
   quotationPpn: number
   quotationTotal: number
-  quotationDiscountPct: string
   quotationPpnPct: string
   customers: Customer[]
 }) {
