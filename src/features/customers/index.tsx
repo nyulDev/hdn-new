@@ -65,6 +65,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 type FormData = CreateCustomerData
 
 const emptyForm: FormData = {
+  kode: '',
   pt: '',
   namaKapal: '',
   kontak: '',
@@ -127,6 +128,7 @@ export function Customers() {
   const openEdit = (c: Customer) => {
     setEditTarget(c)
     setForm({
+      kode: c.id,
       pt: c.pt,
       namaKapal: c.namaKapal,
       kontak: c.kontak,
@@ -139,6 +141,7 @@ export function Customers() {
   // ── validate ──
   const validate = (): boolean => {
     const e: Partial<FormData> = {}
+    if (!form.kode.trim()) e.kode = 'Customer ID wajib diisi'
     if (!form.pt.trim()) e.pt = 'PT wajib diisi'
     if (!form.namaKapal.trim()) e.namaKapal = 'Nama Kapal wajib diisi'
     if (!form.kontak.trim()) e.kontak = 'Kontak wajib diisi'
@@ -370,17 +373,23 @@ export function Customers() {
           </DialogHeader>
 
           <div className='grid gap-4 py-2'>
-            {/* Customer ID (readonly when edit) */}
-            {editTarget && (
-              <div className='grid gap-1.5'>
-                <Label className='text-xs font-semibold'>Customer ID</Label>
-                <Input
-                  value={editTarget.id}
-                  readOnly
-                  className='h-9 bg-muted/40 font-mono text-sm'
-                />
-              </div>
-            )}
+            {/* Customer ID is manual for new customers and fixed when editing. */}
+            <div className='grid gap-1.5'>
+              <Label htmlFor='kode' className='text-xs font-semibold'>
+                Customer ID <span className='text-destructive'>*</span>
+              </Label>
+              <Input
+                id='kode'
+                value={form.kode}
+                onChange={(e) => setField('kode', e.target.value)}
+                placeholder='Contoh: CUST-001'
+                readOnly={!!editTarget}
+                className={`h-9 font-mono text-sm ${editTarget ? 'bg-muted/40' : ''} ${errors.kode ? 'border-destructive' : ''}`}
+              />
+              {errors.kode && (
+                <p className='text-xs text-destructive'>{errors.kode}</p>
+              )}
+            </div>
 
             {/* PT */}
             <div className='grid gap-1.5'>

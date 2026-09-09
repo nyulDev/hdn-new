@@ -25,16 +25,11 @@ router.get('/', async (req, res) => {
 
 // POST new customer
 router.post('/', async (req, res) => {
-  const { pt, namaKapal, kontak, alamat } = req.body;
+  const { kode, pt, namaKapal, kontak, alamat } = req.body;
   try {
-    // Generate kode (e.g. CUST-001)
-    const result = await sql`SELECT kode FROM customers ORDER BY id DESC LIMIT 1`;
-    let nextNum = 1;
-    if (result.length > 0 && result[0].kode) {
-      const numStr = result[0].kode.replace('CUST-', '');
-      nextNum = parseInt(numStr, 10) + 1;
+    if (!kode || !String(kode).trim()) {
+      return res.status(400).json({ error: 'Customer ID is required' });
     }
-    const kode = `CUST-${String(nextNum).padStart(3, '0')}`;
 
     const newCustomer = await sql`
       INSERT INTO customers (kode, pt, nama_kapal, kontak, alamat)
