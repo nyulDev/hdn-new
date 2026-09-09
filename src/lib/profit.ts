@@ -35,7 +35,31 @@ export const getQuotationAfterDiscount = (data: {
   items?: Array<Record<string, unknown>>
 }) => {
   const formInfo = data.formInfo ?? {}
+  const quotationTotalAfterDiscount = formInfo.quotationTotalAfterDiscount
+  if (
+    quotationTotalAfterDiscount !== undefined &&
+    quotationTotalAfterDiscount !== null &&
+    String(quotationTotalAfterDiscount).trim() !== ''
+  ) {
+    return parseQuotationNumber(quotationTotalAfterDiscount)
+  }
+  const invoiceTotalAfterDiscount = formInfo.invoiceTotalAfterDiscount
+  if (
+    invoiceTotalAfterDiscount !== undefined &&
+    invoiceTotalAfterDiscount !== null &&
+    String(invoiceTotalAfterDiscount).trim() !== ''
+  ) {
+    return parseQuotationNumber(invoiceTotalAfterDiscount)
+  }
   const subtotal = getQuotationSubtotal(data)
+  const quotationDiscountAmount = formInfo.quotationDiscountAmount
+  if (
+    quotationDiscountAmount !== undefined &&
+    quotationDiscountAmount !== null &&
+    String(quotationDiscountAmount).trim() !== ''
+  ) {
+    return subtotal - parseQuotationNumber(quotationDiscountAmount)
+  }
   const discount = parseQuotationNumber(formInfo.quotationDiscountPct)
   return subtotal * (1 - discount / 100)
 }
@@ -43,7 +67,16 @@ export const getQuotationAfterDiscount = (data: {
 export const getModalSubtotal = (data: {
   items?: Array<Record<string, unknown>>
   costs?: Record<string, unknown>
+  formInfo?: Record<string, unknown>
 }) => {
+  const storedSubtotal = data.formInfo?.modalEstimasiSubtotal
+  if (
+    storedSubtotal !== undefined &&
+    storedSubtotal !== null &&
+    String(storedSubtotal).trim() !== ''
+  ) {
+    return parseQuotationNumber(storedSubtotal)
+  }
   const items = data.items ?? []
   const costs = data.costs ?? {}
   const totalModalSparepart = items.reduce(
@@ -56,6 +89,14 @@ export const getModalSubtotal = (data: {
   const afterDiscount =
     totalModalSparepart + (discountPct / 100) * totalModalSparepart
   const usdRate = parseQuotationNumber(costs.usdRate)
+  const otherCostsTotal = (
+    (costs.otherCosts as Array<Record<string, unknown>>) ?? []
+  ).reduce(
+    (total, cost) =>
+      total +
+      parseQuotationNumber(cost.qty) * parseQuotationNumber(cost.unitPrice),
+    0
+  )
   const costsTotal =
     parseQuotationNumber(costs.qtyBankCharge) *
       parseQuotationNumber(costs.bankChargeUsd) +
@@ -79,7 +120,8 @@ export const getModalSubtotal = (data: {
     parseQuotationNumber(costs.qtyServiceboat) *
       parseQuotationNumber(costs.serviceboatLs) +
     parseQuotationNumber(costs.qtyLainLain) *
-      parseQuotationNumber(costs.lainLainLs)
+      parseQuotationNumber(costs.lainLainLs) +
+    otherCostsTotal
 
   return afterDiscount + costsTotal
 }
@@ -114,7 +156,16 @@ export const getActualItemSubtotal = (item: Record<string, unknown>) => {
 export const getActualModalSubtotal = (data: {
   items?: Array<Record<string, unknown>>
   costs?: Record<string, unknown>
+  formInfo?: Record<string, unknown>
 }) => {
+  const storedSubtotal = data.formInfo?.modalAktualSubtotal
+  if (
+    storedSubtotal !== undefined &&
+    storedSubtotal !== null &&
+    String(storedSubtotal).trim() !== ''
+  ) {
+    return parseQuotationNumber(storedSubtotal)
+  }
   const items = data.items ?? []
   const costs = data.costs ?? {}
   const totalModalSparepart = items.reduce(
@@ -125,6 +176,14 @@ export const getActualModalSubtotal = (data: {
   const afterDiscount =
     totalModalSparepart + (discountPct / 100) * totalModalSparepart
   const usdRate = parseQuotationNumber(costs.usdRate)
+  const otherCostsTotal = (
+    (costs.otherCosts as Array<Record<string, unknown>>) ?? []
+  ).reduce(
+    (total, cost) =>
+      total +
+      parseQuotationNumber(cost.qty) * parseQuotationNumber(cost.unitPrice),
+    0
+  )
   const costsTotal =
     parseQuotationNumber(costs.qtyBankCharge) *
       parseQuotationNumber(costs.bankChargeUsd) +
@@ -148,7 +207,8 @@ export const getActualModalSubtotal = (data: {
     parseQuotationNumber(costs.qtyServiceboat) *
       parseQuotationNumber(costs.serviceboatLs) +
     parseQuotationNumber(costs.qtyLainLain) *
-      parseQuotationNumber(costs.lainLainLs)
+      parseQuotationNumber(costs.lainLainLs) +
+    otherCostsTotal
 
   return afterDiscount + costsTotal
 }

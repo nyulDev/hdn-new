@@ -50,6 +50,7 @@ interface LineItem {
   qty: string
   qtyActual?: string
   unit: string
+  unitActual?: string
   unitPrice: string
   amount: number
   unitPriceActual?: string
@@ -325,6 +326,7 @@ export function ModalEstimasi({
   const [quotationRange, setQuotationRange] = useState('')
   const [estimasiPct, setEstimasiPct] = useState('')
   const [quotationDiscountPct, setQuotationDiscountPct] = useState('10')
+  const [quotationDiscountAmount, setQuotationDiscountAmount] = useState('')
   const [quotationPpnPct, setQuotationPpnPct] = useState('12')
   const [showQuotationTable, setShowQuotationTable] = useState(!quotationMode)
   const [quotationDetails, setQuotationDetails] = useState(
@@ -358,9 +360,13 @@ export function ModalEstimasi({
               estimasiPct,
               quotationDetails,
               quotationDiscountPct,
+              quotationDiscountAmount: String(Math.round(quotationDiscount)),
+              modalEstimasiSubtotal: subTotal,
               quotationPpnPct,
             }
-          : formInfo,
+          : actualMode
+            ? { ...formInfo, modalAktualSubtotal: subTotal }
+            : formInfo,
         items,
         costs,
         status,
@@ -412,6 +418,9 @@ export function ModalEstimasi({
       setQuotationRange(String(loadedFormInfo.quotationRange ?? ''))
       setQuotationDiscountPct(
         String(loadedFormInfo.quotationDiscountPct ?? '10')
+      )
+      setQuotationDiscountAmount(
+        String(loadedFormInfo.quotationDiscountAmount ?? '')
       )
       setQuotationPpnPct(String(loadedFormInfo.quotationPpnPct ?? '12'))
       setItems(data.items || [])
@@ -531,6 +540,7 @@ export function ModalEstimasi({
       qty: '',
       qtyActual: '',
       unit: 'PC',
+      unitActual: 'PC',
       unitPrice: '',
       amount: 0,
       unitPriceActual: '',
@@ -628,6 +638,7 @@ export function ModalEstimasi({
     setQuotationRange('')
     setEstimasiPct('')
     setQuotationDiscountPct('10')
+    setQuotationDiscountAmount('')
     setQuotationPpnPct('12')
     setQuotationDetails(defaultQuotationDetails)
     setShowQuotationTable(!quotationMode)
@@ -713,8 +724,11 @@ export function ModalEstimasi({
     (total, item) => total + parseNum(item.qty) * getQuotationUnitPrice(item),
     0
   )
-  const quotationDiscount =
+  const calculatedQuotationDiscount =
     quotationSubtotal * (parseNum(quotationDiscountPct) / 100)
+  const quotationDiscount = quotationDiscountAmount.trim()
+    ? parseNum(quotationDiscountAmount)
+    : calculatedQuotationDiscount
   const quotationAfterDiscount = quotationSubtotal - quotationDiscount
   const quotationPpn =
     quotationAfterDiscount * (parseNum(quotationPpnPct) / 100)
@@ -731,12 +745,14 @@ export function ModalEstimasi({
     '',
     'Unit Price Estimasi',
     'Amount Estimasi',
-    ...(actualMode ? ['Qty Aktual', 'Unit Price Aktual', 'Amount Aktual'] : []),
+    ...(actualMode
+      ? ['Qty Aktual', 'Satuan Aktual', 'Unit Price Aktual', 'Amount Aktual']
+      : []),
     ...(!quotationMode ? ['Toko'] : []),
     ...(quotationMode ? ['Unit Price Quotation', 'Amount Quotation'] : []),
     '',
   ]
-  const tableColumnCount = quotationMode ? 10 : actualMode ? 12 : 9
+  const tableColumnCount = quotationMode ? 10 : actualMode ? 13 : 9
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1121,6 +1137,7 @@ export function ModalEstimasi({
                 {actualMode && (
                   <>
                     <col className='w-14' />
+                    <col className='w-12' />
                     <col className='w-28' />
                     <col className='w-28' />
                   </>
@@ -1250,6 +1267,17 @@ export function ModalEstimasi({
                               )
                             )}
                           </div>
+                        </td>
+                        <td className='border-r py-0.5 align-top'>
+                          <Cell
+                            value={item.unitActual ?? item.unit}
+                            onChange={(v) =>
+                              updateItem(item.id, 'unitActual', v)
+                            }
+                            placeholder='PC'
+                            align='center'
+                            className='w-full'
+                          />
                         </td>
                         <td className='border-r py-0.5 align-top'>
                           <div className='space-y-1.5'>
@@ -1396,6 +1424,7 @@ export function ModalEstimasi({
                           <td className='border-r' />
                           <td className='border-r' />
                           <td className='border-r' />
+                          <td className='border-r' />
                         </>
                       )}
                       {!quotationMode && <td className='border-r' />}
@@ -1530,15 +1559,30 @@ export function ModalEstimasi({
                                   min='0'
                                   max='100'
                                   value={quotationDiscountPct}
-                                  onChange={(event) =>
+                                  onChange={(event) => {
                                     setQuotationDiscountPct(event.target.value)
-                                  }
+                                    setQuotationDiscountAmount('')
+                                  }}
                                   className='h-6 w-14 rounded-none border-dotted px-1 text-right text-xs font-normal shadow-none focus-visible:ring-1'
                                 />
                                 %
                               </span>
                             }
-                            value={-quotationDiscount}
+                            value={
+                              <Input
+                                type='number'
+                                min='0'
+                                value={
+                                  quotationDiscountAmount ||
+                                  String(Math.round(quotationDiscount))
+                                }
+                                onChange={(event) =>
+                                  setQuotationDiscountAmount(event.target.value)
+                                }
+                                aria-label='Discount amount'
+                                className='h-6 w-32 rounded-none border-dotted px-1 text-right text-xs font-normal shadow-none focus-visible:ring-1'
+                              />
+                            }
                           />
                           <QuotationSummaryRow
                             label='Total after discount'
@@ -2641,7 +2685,7 @@ function QuotationSummaryRow({
   strong = false,
 }: {
   label: React.ReactNode
-  value: number
+  value: number | React.ReactNode
   strong?: boolean
 }) {
   return (
@@ -2649,7 +2693,9 @@ function QuotationSummaryRow({
       className={`grid grid-cols-[1fr_120px] border-b border-dotted py-1 ${strong ? 'font-bold' : ''}`}
     >
       <span>{label}</span>
-      <span className='text-right'>{formatQuotationAmount(value)}</span>
+      <span className='text-right'>
+        {typeof value === 'number' ? formatQuotationAmount(value) : value}
+      </span>
     </div>
   )
 }

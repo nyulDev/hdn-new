@@ -33,6 +33,13 @@ const parseQuotationNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const getTodayInputDate = () => {
+  const today = new Date()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${today.getFullYear()}-${month}-${day}`
+}
+
 type InvoiceRow = {
   id: number
   itemKey: string
@@ -50,6 +57,7 @@ export function InvoicePage() {
   const [noQuoInput, setNoQuoInput] = useState('')
   const [noPo, setNoPo] = useState('')
   const [location, setLocation] = useState('')
+  const [invoiceDate, setInvoiceDate] = useState(getTodayInputDate)
   const [loading, setLoading] = useState(false)
   const [quotationList, setQuotationList] = useState<
     { id: number; noQuo: string }[]
@@ -66,6 +74,7 @@ export function InvoicePage() {
     Record<string, number>
   >({})
   const [saving, setSaving] = useState(false)
+  const [showOriginalQuotation, setShowOriginalQuotation] = useState(false)
 
   useEffect(() => {
     void getEstimasiList()
@@ -101,6 +110,7 @@ export function InvoicePage() {
       setSelectedQuantities({})
       setNoPo(data.formInfo?.noPo ?? data.formInfo?.noPO ?? '')
       setLocation(data.formInfo?.supplyLocation || 'PLTU Suralaya')
+      setInvoiceDate(data.formInfo?.invoiceDate || getTodayInputDate())
       setNoQuoInput(data.formInfo?.noQuo ?? noQuo)
     } catch (error) {
       setLoadedInvoice(null)
@@ -168,19 +178,68 @@ export function InvoicePage() {
   )
 
   const subtotal = invoiceRows.reduce((sum, row) => sum + row.amount, 0)
-  const discount = Number(loadedInvoice?.costs?.discountPct ?? 0)
-  const discountAmount = subtotal * (discount / 100)
+  const quotationDiscountAmount =
+    loadedInvoice?.formInfo?.quotationDiscountAmount
+  const discount = Number(
+    loadedInvoice?.formInfo?.quotationDiscountPct ??
+      loadedInvoice?.costs?.discountPct ??
+      0
+  )
+  const discountAmount =
+    quotationDiscountAmount !== undefined &&
+    String(quotationDiscountAmount).trim() !== ''
+      ? parseQuotationNumber(quotationDiscountAmount)
+      : subtotal * (discount / 100)
   const totalAfterDiscount = subtotal - discountAmount
+  const dpp = (11 / 12) * totalAfterDiscount
   const ppnPct = Number(loadedInvoice?.formInfo?.quotationPpnPct ?? 12)
-  const ppn = totalAfterDiscount * (ppnPct / 100)
-  const totalInvoice = totalAfterDiscount + ppn
+  const ppn = dpp * (ppnPct / 100)
+  const totalInvoice = dpp + ppn
+  const previewRows = showOriginalQuotation
+    ? invoiceRows.map((row) => ({
+        ...row,
+        qty: row.quotationQty,
+        amount: row.quotationQty * row.unitPrice,
+      }))
+    : invoiceRows
+  const previewSubtotal = previewRows.reduce((sum, row) => sum + row.amount, 0)
+  const previewDiscountAmount =
+    quotationDiscountAmount !== undefined &&
+    String(quotationDiscountAmount).trim() !== ''
+      ? parseQuotationNumber(quotationDiscountAmount)
+      : previewSubtotal * (discount / 100)
+  const previewTotalAfterDiscount = previewSubtotal - previewDiscountAmount
+  const previewDpp = (11 / 12) * previewTotalAfterDiscount
+  const previewPpn = previewDpp * (ppnPct / 100)
+  const previewTotalInvoice = previewDpp + previewPpn
   const invoiceNo = loadedInvoice
     ? `${(loadedInvoice.formInfo?.noQuo || 'XXX').replace(/\s+/g, '')}-INV-${new Date().getFullYear()}`
     : 'XXX-INV-2026'
   const customer = customers.find(
     (item) => item.pt === loadedInvoice?.formInfo?.pt
   )
-
+  const savedInvoiceForReference = invoices
+    .filter(
+      (invoice) =>
+        invoice.formInfo?.noRfs &&
+        invoice.formInfo.noRfs === loadedInvoice?.formInfo?.noRfs
+    )
+    .sort((first, second) =>
+      String(second.updatedAt).localeCompare(String(first.updatedAt))
+    )[0]
+  const savedTotalAfterDiscount =
+    savedInvoiceForReference?.formInfo?.invoiceTotalAfterDiscount
+  const invoicePreviewTotalAfterDiscount =
+    savedTotalAfterDiscount !== undefined &&
+    savedTotalAfterDiscount !== null &&
+    String(savedTotalAfterDiscount).trim() !== ''
+      ? parseQuotationNumber(savedTotalAfterDiscount)
+      : totalAfterDiscount
+  const invoicePreviewDiscountAmount =
+    subtotal - invoicePreviewTotalAfterDiscount
+  const invoicePreviewDpp = (11 / 12) * invoicePreviewTotalAfterDiscount
+  const invoicePreviewPpn = invoicePreviewDpp * (ppnPct / 100)
+  const invoicePreviewTotal = invoicePreviewDpp + invoicePreviewPpn
   const handleQuantityChange = (itemKey: string, value: string) => {
     const quantity = parseQuotationNumber(value)
     setSelectedQuantities((current) => ({ ...current, [itemKey]: quantity }))
@@ -211,6 +270,9 @@ export function InvoicePage() {
         formInfo: {
           ...(loadedInvoice.formInfo ?? {}),
           noPo,
+          invoiceDate,
+          invoiceTotalAfterDiscount: totalAfterDiscount,
+          quotationTotalAfterDiscount: previewTotalAfterDiscount,
           supplyLocation: location,
         },
         items: invoiceRows
@@ -289,6 +351,14 @@ export function InvoicePage() {
       {loadedInvoice ? (
         <div className='rounded-xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:border-0 print:p-0 print:shadow-none'>
           <div className='mb-4 flex justify-end gap-2 print:hidden'>
+            <Button
+              variant='outline'
+              onClick={() => setShowOriginalQuotation((current) => !current)}
+            >
+              {showOriginalQuotation
+                ? 'Kembali ke Invoice'
+                : 'Data Quotation Awal'}
+            </Button>
             <Button onClick={() => void handleSaveInvoice()} disabled={saving}>
               {saving ? 'Menyimpan...' : 'Simpan Invoice'}
             </Button>
@@ -328,20 +398,22 @@ export function InvoicePage() {
 
           <div className='flex flex-col items-center justify-center border-b border-slate-300 pb-3'>
             <h3 className='text-5xl font-black tracking-wide text-red-600 uppercase'>
-              INVOICE
+              {showOriginalQuotation ? 'QUOTATION' : 'INVOICE'}
             </h3>
           </div>
 
           <div className='mt-6 grid gap-4 md:grid-cols-[1.4fr_0.9fr]'>
             <div className='space-y-2 text-sm'>
               <p>
-                <span className='font-semibold'>PT. Coba Coba</span>
+                <span className='font-semibold'>
+                  {loadedInvoice.formInfo?.pt || '-'}
+                </span>
               </p>
               <p>Attn. {customer?.kontak || '-'}</p>
               <p>
                 Reference : {loadedInvoice.formInfo?.noRfs || 'RFS-XXXX-XXX'}
               </p>
-              <p>MV. Kapal Api</p>
+              <p> {loadedInvoice.formInfo?.kapal || '-'}</p>
               <p>Terms : 30 calendar days</p>
               <p>Due Date : Fri 2 Oct 2026</p>
             </div>
@@ -357,21 +429,35 @@ export function InvoicePage() {
                     value={noPo}
                     onChange={(event) => setNoPo(event.target.value)}
                     placeholder='Ketik No. PO'
-                    className='inline-flex h-8 w-44 print:hidden'
+                    className='inline-flex h-8 w-64 print:hidden'
                     aria-label='No. PO'
                   />
                   <span className='hidden print:inline'>{noPo || '-'}</span>
                 </span>
                 <span className='font-semibold'>CUSTOMER ID</span>
-                <span>: {loadedInvoice.formInfo?.customerId || '093'}</span>
-                <span className='font-semibold'>DATE</span>
+                <span>: {customer?.id || '-'}</span>
+                <span className='font-semibold'>TANGGAL</span>
                 <span>
                   :{' '}
-                  {new Date().toLocaleDateString('id-ID', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
+                  <Input
+                    type='date'
+                    value={invoiceDate}
+                    onChange={(event) => setInvoiceDate(event.target.value)}
+                    className='inline-flex h-8 w-40 print:hidden'
+                    aria-label='Tanggal invoice'
+                  />
+                  <span className='hidden print:inline'>
+                    {invoiceDate
+                      ? new Date(`${invoiceDate}T00:00:00`).toLocaleDateString(
+                          'id-ID',
+                          {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          }
+                        )
+                      : '-'}
+                  </span>
                 </span>
                 <span className='font-semibold'>PAGE</span>
                 <span>: 1</span>
@@ -418,16 +504,18 @@ export function InvoicePage() {
                 </tr>
               </thead>
               <tbody>
-                {invoiceRows.length > 0 ? (
-                  invoiceRows.map((row) => (
+                {previewRows.length > 0 ? (
+                  previewRows.map((row) => (
                     <tr
                       key={row.id}
                       className={`align-top ${row.qty === 0 ? 'print:hidden' : ''}`}
                     >
                       <td className='w-12 border border-slate-300 px-1 py-2 text-center print:hidden'>
                         <Checkbox
-                          checked={row.qty > 0}
-                          disabled={row.remainingQty === 0}
+                          checked={showOriginalQuotation || row.qty > 0}
+                          disabled={
+                            showOriginalQuotation || row.remainingQty === 0
+                          }
                           onCheckedChange={(checked) =>
                             handleItemToggle(row.itemKey, checked === true)
                           }
@@ -447,9 +535,14 @@ export function InvoicePage() {
                         <Input
                           type='number'
                           min={0}
-                          max={row.remainingQty}
+                          max={
+                            showOriginalQuotation
+                              ? row.quotationQty
+                              : row.remainingQty
+                          }
                           step='any'
                           value={row.qty}
+                          readOnly={showOriginalQuotation}
                           onChange={(event) =>
                             handleQuantityChange(
                               row.itemKey,
@@ -492,27 +585,57 @@ export function InvoicePage() {
             <div className='w-full max-w-md space-y-2 text-sm'>
               <div className='flex justify-between'>
                 <span>Sub Total :</span>
-                <span>{formatCurrency(subtotal)}</span>
+                <span>
+                  {formatCurrency(
+                    showOriginalQuotation ? previewSubtotal : subtotal
+                  )}
+                </span>
               </div>
               <div className='flex justify-between'>
                 <span>Discount :</span>
-                <span>{formatCurrency(discountAmount)}</span>
+                <span>
+                  {formatCurrency(
+                    showOriginalQuotation
+                      ? previewDiscountAmount
+                      : invoicePreviewDiscountAmount
+                  )}
+                </span>
               </div>
               <div className='flex justify-between border-t border-slate-300 pt-2 font-semibold'>
                 <span>Total after discount :</span>
-                <span>{formatCurrency(totalAfterDiscount)}</span>
+                <span>
+                  {formatCurrency(
+                    showOriginalQuotation
+                      ? previewTotalAfterDiscount
+                      : invoicePreviewTotalAfterDiscount
+                  )}
+                </span>
               </div>
               <div className='flex justify-between'>
                 <span>DPP :</span>
-                <span>{formatCurrency(totalAfterDiscount)}</span>
+                <span>
+                  {formatCurrency(
+                    showOriginalQuotation ? previewDpp : invoicePreviewDpp
+                  )}
+                </span>
               </div>
               <div className='flex justify-between'>
                 <span>PPN {ppnPct}% :</span>
-                <span>{formatCurrency(ppn)}</span>
+                <span>
+                  {formatCurrency(
+                    showOriginalQuotation ? previewPpn : invoicePreviewPpn
+                  )}
+                </span>
               </div>
               <div className='mt-3 flex justify-between border border-slate-300 bg-slate-100 px-3 py-2 text-base font-bold'>
                 <span>TOTAL INVOICE MUST BE PAID :</span>
-                <span>{formatCurrency(totalInvoice)}</span>
+                <span>
+                  {formatCurrency(
+                    showOriginalQuotation
+                      ? previewTotalInvoice
+                      : invoicePreviewTotal
+                  )}
+                </span>
               </div>
             </div>
           </div>

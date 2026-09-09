@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search as SearchIcon } from 'lucide-react'
+import {
+  getEstimasiByNoQuo,
+  getEstimasiList,
+  type EstimasiFull,
+} from '@/lib/api/estimasi'
 import { getInvoices, type InvoiceRecord } from '@/lib/api/invoice'
 import {
-  getActualModalHsiAmount,
   getActualModalSubtotal,
   getModalSubtotal,
   getQuotationAfterDiscount,
@@ -55,15 +59,22 @@ type SalesRow = {
   netProfit: number
 }
 
-const toSalesRow = (invoice: InvoiceRecord, index: number): SalesRow => {
-  const totalAfterDiscount = getQuotationAfterDiscount(invoice)
-  const ppnPct = parseQuotationNumber(invoice.formInfo?.quotationPpnPct ?? 12)
+const toSalesRow = (
+  invoice: InvoiceRecord,
+  quotation: EstimasiFull | undefined,
+  index: number
+): SalesRow => {
+  const quotationData = quotation ?? invoice
+  const totalAfterDiscount = getQuotationAfterDiscount(quotationData)
+  const ppnPct = parseQuotationNumber(
+    quotationData.formInfo?.quotationPpnPct ?? 12
+  )
   const ppn = totalAfterDiscount * (ppnPct / 100)
-  const modalRequested = getModalSubtotal(invoice)
+  const modalRequested = getModalSubtotal(quotationData)
   const actualPurchase = getActualModalSubtotal(invoice)
   const grossProfit = totalAfterDiscount - actualPurchase
   const marketingFee = Math.max(grossProfit, 0) * 0.1
-  const hsiShare = getActualModalHsiAmount(invoice)
+  const hsiShare = modalRequested * 0.08
   const socialAid = parseQuotationNumber(
     invoice.formInfo?.bansosAmount ?? invoice.costs?.bansosAmount
   )
@@ -90,27 +101,78 @@ const toSalesRow = (invoice: InvoiceRecord, index: number): SalesRow => {
 
 export function Penjualan() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
+  const [quotations, setQuotations] = useState<Record<string, EstimasiFull>>({})
+  const [activeQuotationNumbers, setActiveQuotationNumbers] =
+    useState<Set<string> | null>(null)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getInvoices()
-      .then(setInvoices)
-      .catch(() => setError('Data penjualan belum dapat dimuat.'))
-      .finally(() => setLoading(false))
+    const loadSalesData = async () => {
+      const [invoiceResult, quotationResult] = await Promise.allSettled([
+        getInvoices(),
+        getEstimasiList(),
+      ])
+
+      if (invoiceResult.status === 'rejected') {
+        setError('Data penjualan belum dapat dimuat.')
+        setLoading(false)
+        return
+      }
+
+      setInvoices(invoiceResult.value)
+
+      if (quotationResult.status === 'rejected') {
+        setLoading(false)
+        return
+      }
+
+      const quotationList = quotationResult.value
+      setActiveQuotationNumbers(
+        new Set(quotationList.map((quotation) => quotation.noQuo))
+      )
+
+      const quotationResults = await Promise.allSettled(
+        quotationList.map((quotation) => getEstimasiByNoQuo(quotation.noQuo))
+      )
+      const quotationEntries = quotationResults.flatMap((result, index) =>
+        result.status === 'fulfilled'
+          ? [[quotationList[index].noQuo, result.value] as const]
+          : []
+      )
+      setQuotations(Object.fromEntries(quotationEntries))
+      setLoading(false)
+    }
+
+    void loadSalesData()
   }, [])
 
   const rows = useMemo(
     () =>
-      invoices.map(toSalesRow).filter((row) => {
-        const query = search.trim().toLowerCase()
-        if (!query) return true
-        return `${row.customer} ${row.invoiceNumber} ${row.date}`
-          .toLowerCase()
-          .includes(query)
-      }),
-    [invoices, search]
+      invoices
+        .filter(
+          (invoice) =>
+            activeQuotationNumbers === null ||
+            activeQuotationNumbers.has(
+              String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
+            )
+        )
+        .map((invoice, index) =>
+          toSalesRow(
+            invoice,
+            quotations[String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')],
+            index
+          )
+        )
+        .filter((row) => {
+          const query = search.trim().toLowerCase()
+          if (!query) return true
+          return `${row.customer} ${row.invoiceNumber} ${row.date}`
+            .toLowerCase()
+            .includes(query)
+        }),
+    [activeQuotationNumbers, invoices, quotations, search]
   )
 
   return (

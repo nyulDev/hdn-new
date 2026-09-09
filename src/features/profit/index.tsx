@@ -5,12 +5,10 @@ import {
   type EstimasiList,
 } from '@/lib/api/estimasi'
 import {
-  getActualModalHsiAmount,
   getActualModalSubtotal,
   getModalHsiAmount,
   getModalSubtotal,
   getQuotationAfterDiscount,
-  getQuotationSubtotal,
   parseQuotationNumber,
 } from '@/lib/profit'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -85,15 +83,13 @@ export function Profit() {
     try {
       const data = await getEstimasiByNoQuo(selectedNoQuo)
       const invoiceEstimate = getQuotationAfterDiscount(data)
-      const invoiceActual = getQuotationSubtotal(data)
+      const invoiceActual = getQuotationAfterDiscount(data)
       const actualModalSubtotal = getActualModalSubtotal(data)
       const hsiAmount = getModalHsiAmount(data)
-      const actualHsiAmount = getActualModalHsiAmount(data)
       const loadedDepartment = String(data.formInfo?.dept ?? '').trim()
       const actualBansosAmount =
         invoiceActual > 0
-          ? (invoiceActual / 1.15) *
-            (parseQuotationNumber(bansosActualPct) / 100)
+          ? invoiceActual * (parseQuotationNumber(bansosActualPct) / 100)
           : 0
       setDepartment(loadedDepartment)
       setValues((current) => ({
@@ -102,7 +98,7 @@ export function Profit() {
         invoiceEstimate,
         modalActual: actualModalSubtotal,
         modalEstimate: getModalSubtotal(data),
-        investorActual: actualHsiAmount,
+        investorActual: hsiAmount,
         investorEstimate: hsiAmount,
         bansosActual: actualBansosAmount,
         bansosEstimate:
@@ -316,7 +312,7 @@ export function Profit() {
                   {formatAmount(values.investorActual)}
                 </td>
                 <td className='border-r px-2 py-1 text-right'>
-                  {formatAmount(values.modalActual)}
+                  {formatAmount(values.modalEstimate)}
                 </td>
                 <td className='border-r px-2 py-1 text-right'>
                   {formatAmount(hsiEstimate)}
