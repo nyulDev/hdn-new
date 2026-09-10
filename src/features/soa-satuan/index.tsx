@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Download, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import { getEstimasiList } from '@/lib/api/estimasi'
 import {
   getInvoices,
   updateInvoice,
@@ -20,6 +21,14 @@ const formatDate = (value: Date | string | undefined) => {
   if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleDateString('id-ID')
 }
+
+const formatLongDate = (value: Date) =>
+  value.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
 
 const formatInputDate = (value: Date | string | undefined) => {
   if (!value) return ''
@@ -136,25 +145,71 @@ export function SoaSatuan() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeQuotationNumbers, setActiveQuotationNumbers] =
+    useState<Set<string> | null>(null)
   const [paymentDates, setPaymentDates] = useState<Record<number, string>>({})
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<number | null>(
     null
   )
 
   useEffect(() => {
-    getInvoices()
-      .then(setInvoices)
-      .catch(() => setError('Data aging report belum dapat dimuat.'))
-      .finally(() => setLoading(false))
+    const originalTitle = document.title
+    const clearPrintTitle = () => {
+      document.title = ''
+    }
+    const restorePrintTitle = () => {
+      document.title = originalTitle
+    }
+
+    window.addEventListener('beforeprint', clearPrintTitle)
+    window.addEventListener('afterprint', restorePrintTitle)
+
+    return () => {
+      window.removeEventListener('beforeprint', clearPrintTitle)
+      window.removeEventListener('afterprint', restorePrintTitle)
+      document.title = originalTitle
+    }
+  }, [])
+
+  useEffect(() => {
+    const loadAgingData = async () => {
+      const [invoiceResult, quotationResult] = await Promise.allSettled([
+        getInvoices(),
+        getEstimasiList(),
+      ])
+
+      if (
+        invoiceResult.status === 'rejected' ||
+        quotationResult.status === 'rejected'
+      ) {
+        setError('Data aging report belum dapat dimuat.')
+        setLoading(false)
+        return
+      }
+
+      setInvoices(invoiceResult.value)
+      setActiveQuotationNumbers(
+        new Set(quotationResult.value.map((quotation) => quotation.noQuo))
+      )
+      setLoading(false)
+    }
+
+    void loadAgingData()
   }, [])
 
   const referenceDate = useMemo(() => new Date(), [])
   const allRows = useMemo(
     () =>
-      invoices.map((invoice, index) =>
-        toAgingRow(invoice, index, referenceDate)
-      ),
-    [invoices, referenceDate]
+      invoices
+        .filter(
+          (invoice) =>
+            activeQuotationNumbers !== null &&
+            activeQuotationNumbers.has(
+              String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
+            )
+        )
+        .map((invoice, index) => toAgingRow(invoice, index, referenceDate)),
+    [activeQuotationNumbers, invoices, referenceDate]
   )
   const customers = useMemo(
     () => [...new Set(allRows.map((row) => row.customer))].sort(),
@@ -172,6 +227,11 @@ export function SoaSatuan() {
       return matchesPt && matchesSearch
     })
   }, [allRows, search, selectedPt])
+  const printRows = useMemo(() => rows.filter((row) => !row.isPaid), [rows])
+  const printTotalAmount = printRows.reduce(
+    (total, row) => total + row.amount,
+    0
+  )
   const totalAmount = rows.reduce((total, row) => total + row.amount, 0)
 
   const handlePaymentDateChange = (invoiceId: number, value: string) => {
@@ -211,13 +271,13 @@ export function SoaSatuan() {
 
   return (
     <>
-      <Header>
+      <Header className='print:hidden'>
         <ThemeSwitch />
         <ProfileDropdown />
       </Header>
       <Main fluid className='px-2 py-6 sm:px-3 lg:px-4'>
         <div className='rounded-xl border bg-background p-4 shadow-sm print:border-0 print:p-0 print:shadow-none'>
-          <div className='mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
+          <div className='mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between print:hidden'>
             <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
               <h1 className='text-xl font-bold tracking-tight'>Aging Report</h1>
               <select
@@ -250,7 +310,10 @@ export function SoaSatuan() {
               </label>
               <button
                 type='button'
-                onClick={() => window.print()}
+                onClick={() => {
+                  document.title = ''
+                  window.print()
+                }}
                 className='inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-emerald-500 px-3 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400'
               >
                 <Download className='size-4' />
@@ -262,7 +325,136 @@ export function SoaSatuan() {
             </div>
           </div>
 
-          <div className='overflow-x-auto'>
+          <div className='hidden print:block print:text-black'>
+            <div className='flex items-start justify-between pb-1'>
+              <div>
+                <h2 className='text-[22px] leading-none font-bold text-[#004d91]'>
+                  <span className='text-[#21ae43]'>H</span>ALUAN{' '}
+                  <span className='text-[#21ae43]'>D</span>AYA{' '}
+                  <span className='text-[#21ae43]'>N</span>IAGA, PT.
+                </h2>
+                <p className='text-[9px] font-semibold tracking-[0.35em] text-[#21ae43]'>
+                  www.haluan-group.com
+                </p>
+              </div>
+              <img
+                src='/images/logotok.png'
+                alt='Logo Haluan Daya Niaga'
+                className='h-20 w-20 object-contain'
+              />
+            </div>
+
+            <div className='mt-10 grid grid-cols-[1.2fr_1fr_170px] border border-red-500 text-[10px]'>
+              <div className='border-r border-red-500 text-center'>
+                <p className='font-semibold uppercase'>Date</p>
+                <p>{formatLongDate(referenceDate)}</p>
+              </div>
+              <div className='border-r border-red-500 text-center'>
+                <p className='font-semibold uppercase'>Customer</p>
+                <p>{selectedPt === 'all' ? 'ALL CUSTOMER' : selectedPt}</p>
+              </div>
+              <div className='flex items-center justify-center text-center text-[14px] font-bold italic'>
+                Statement of Account
+              </div>
+            </div>
+
+            <table className='mt-3 w-full table-fixed border-collapse text-[10px]'>
+              <thead>
+                <tr className='border-y border-red-500 text-center font-semibold'>
+                  <th
+                    rowSpan={2}
+                    className='w-[12%] border-r border-slate-300 p-1 text-[9px]'
+                  >
+                    INV. DATE
+                  </th>
+                  <th
+                    rowSpan={2}
+                    className='w-[17%] border-r border-slate-300 p-1'
+                  >
+                    INVOICE NO
+                  </th>
+                  <th
+                    rowSpan={2}
+                    className='w-[9%] border-r border-slate-300 p-1'
+                  >
+                    TERMS (DAYS)
+                  </th>
+                  <th
+                    rowSpan={2}
+                    className='w-[17%] border-r border-slate-300 p-1'
+                  >
+                    DUE DATE
+                  </th>
+                  <th
+                    rowSpan={2}
+                    className='w-[14%] border-r border-slate-300 p-1'
+                  >
+                    AMOUNT
+                  </th>
+                  <th
+                    colSpan={3}
+                    className='border-b border-red-500 p-1 whitespace-nowrap'
+                  >
+                    DUE DATE (DAYS)
+                  </th>
+                  <th
+                    rowSpan={2}
+                    className='w-[14%] border-l border-slate-300 p-1'
+                  >
+                    PAYMENT DATE
+                  </th>
+                </tr>
+                <tr className='text-center font-semibold'>
+                  <th className='w-[5%] border-r border-white bg-[#ffcaca] p-1 whitespace-nowrap'>
+                    0 - 30
+                  </th>
+                  <th className='w-[5%] border-r border-white bg-[#fff59d] p-1 whitespace-nowrap'>
+                    31 - 60
+                  </th>
+                  <th className='w-[5%] bg-[#ff8f8f] p-1 whitespace-nowrap'>
+                    &gt; 61
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {printRows.map((row) => (
+                  <tr
+                    key={`print-${row.invoiceNumber}`}
+                    className='border-b border-slate-300 text-center'
+                  >
+                    <td className='p-1'>{formatDate(row.invoiceDate)}</td>
+                    <td className='p-1'>{row.invoiceNumber}</td>
+                    <td className='p-1'>{row.terms}</td>
+                    <td className='p-1'>{formatDate(row.dueDate)}</td>
+                    <td className='p-1 text-right'>
+                      {Math.round(row.amount).toLocaleString('id-ID')}
+                    </td>
+                    <td className='border-r border-white bg-[#ffcaca] p-1'>
+                      {row.aging030 || ''}
+                    </td>
+                    <td className='border-r border-white bg-[#fff59d] p-1'>
+                      {row.aging3160 || ''}
+                    </td>
+                    <td className='bg-[#ff8f8f] p-1'>{row.aging61 || ''}</td>
+                    <td className='p-1'>
+                      {row.paymentDateInput ? formatDate(row.paymentDate) : ''}
+                    </td>
+                  </tr>
+                ))}
+                <tr className='font-bold'>
+                  <td colSpan={4} className='p-2 text-right'>
+                    TOTAL
+                  </td>
+                  <td className='p-2 text-right'>
+                    {Math.round(printTotalAmount).toLocaleString('id-ID')}
+                  </td>
+                  <td colSpan={4} />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className='overflow-x-auto print:hidden'>
             <table className='w-full min-w-350 border-collapse text-sm'>
               <thead>
                 <tr className='border-b text-left font-medium'>

@@ -75,6 +75,9 @@ export function InvoicePage() {
   >({})
   const [saving, setSaving] = useState(false)
   const [showOriginalQuotation, setShowOriginalQuotation] = useState(false)
+  const [selectedSavedInvoiceId, setSelectedSavedInvoiceId] = useState<
+    number | null
+  >(null)
 
   useEffect(() => {
     void getEstimasiList()
@@ -94,6 +97,15 @@ export function InvoicePage() {
       .catch(() => setInvoices([]))
   }, [])
 
+  const activeQuotationNumbers = new Set(
+    quotationList.map((quotation) => quotation.noQuo)
+  )
+  const printableInvoices = invoices.filter((invoice) =>
+    activeQuotationNumbers.has(
+      String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
+    )
+  )
+
   const handleLoadQuotation = async (selectedNoQuo = noQuoInput) => {
     const noQuo = selectedNoQuo.trim()
 
@@ -106,6 +118,7 @@ export function InvoicePage() {
 
     try {
       const data = await getEstimasiByNoQuo(noQuo)
+      setSelectedSavedInvoiceId(null)
       setLoadedInvoice(data)
       setSelectedQuantities({})
       setNoPo(data.formInfo?.noPo ?? data.formInfo?.noPO ?? '')
@@ -119,6 +132,34 @@ export function InvoicePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleLoadSavedInvoice = (invoiceId: string) => {
+    const invoice = invoices.find((item) => item.id === Number(invoiceId))
+    if (!invoice) {
+      setSelectedSavedInvoiceId(null)
+      return
+    }
+
+    setSelectedSavedInvoiceId(invoice.id)
+    setLoadedInvoice(invoice)
+    setSelectedQuantities(
+      Object.fromEntries(
+        (invoice.items ?? []).map((item: any, index: number) => [
+          getItemKey(item, index),
+          parseQuotationNumber(item?.qty),
+        ])
+      )
+    )
+    setNoQuoInput(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
+    setNoPo(invoice.formInfo?.noPo ?? invoice.formInfo?.noPO ?? '')
+    setLocation(invoice.formInfo?.supplyLocation || 'PLTU Suralaya')
+    setInvoiceDate(
+      invoice.formInfo?.invoiceDate ||
+        invoice.formInfo?.tanggal ||
+        getTodayInputDate()
+    )
+    setShowOriginalQuotation(false)
   }
 
   const quotationRange = parseQuotationNumber(
@@ -135,7 +176,11 @@ export function InvoicePage() {
         `index-${index}`
     )
   const invoicedQuantities = invoices
-    .filter((invoice) => invoice.noQuo === loadedInvoice?.formInfo?.noQuo)
+    .filter(
+      (invoice) =>
+        selectedSavedInvoiceId === null &&
+        invoice.noQuo === loadedInvoice?.formInfo?.noQuo
+    )
     .flatMap((invoice) => invoice.items ?? [])
     .reduce<Record<string, number>>((totals, item) => {
       const key = getItemKey(item, item?.index ?? 0)
@@ -147,7 +192,9 @@ export function InvoicePage() {
       const quotationQty = parseQuotationNumber(item?.qty)
       const itemKey = getItemKey(item, index)
       const remainingQty = Math.max(
-        quotationQty - (invoicedQuantities[itemKey] ?? 0),
+        selectedSavedInvoiceId !== null
+          ? quotationQty
+          : quotationQty - (invoicedQuantities[itemKey] ?? 0),
         0
       )
       const qty = Math.min(
@@ -322,6 +369,7 @@ export function InvoicePage() {
               onChange={(event) => {
                 const selectedNoQuo = event.target.value
                 setNoQuoInput(selectedNoQuo)
+                setSelectedSavedInvoiceId(null)
                 if (
                   quotationList.some(
                     (quotation) => quotation.noQuo === selectedNoQuo
@@ -344,6 +392,20 @@ export function InvoicePage() {
                   <option key={quotation.id} value={quotation.noQuo} />
                 ))}
             </datalist>
+            <select
+              value={selectedSavedInvoiceId ?? ''}
+              onChange={(event) => handleLoadSavedInvoice(event.target.value)}
+              aria-label='Pilih invoice tersimpan untuk cetak ulang'
+              className='h-10 w-full rounded-md border bg-background px-3 text-sm md:w-80'
+            >
+              <option value=''>Cetak ulang invoice tersimpan...</option>
+              {printableInvoices.map((invoice) => (
+                <option key={invoice.id} value={invoice.id}>
+                  {invoice.formInfo?.noRfs || invoice.noQuo} -{' '}
+                  {invoice.formInfo?.pt || invoice.customerName || '-'}
+                </option>
+              ))}
+            </select>
           </div>
         </CardContent>
       </Card>
@@ -351,17 +413,14 @@ export function InvoicePage() {
       {loadedInvoice ? (
         <div className='rounded-xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:border-0 print:p-0 print:shadow-none'>
           <div className='mb-4 flex justify-end gap-2 print:hidden'>
-            <Button
-              variant='outline'
-              onClick={() => setShowOriginalQuotation((current) => !current)}
-            >
-              {showOriginalQuotation
-                ? 'Kembali ke Invoice'
-                : 'Data Quotation Awal'}
-            </Button>
-            <Button onClick={() => void handleSaveInvoice()} disabled={saving}>
-              {saving ? 'Menyimpan...' : 'Simpan Invoice'}
-            </Button>
+            {selectedSavedInvoiceId === null && (
+              <Button
+                onClick={() => void handleSaveInvoice()}
+                disabled={saving}
+              >
+                {saving ? 'Menyimpan...' : 'Simpan Invoice'}
+              </Button>
+            )}
             <Button variant='outline' onClick={() => window.print()}>
               <Printer className='h-4 w-4' />
               Print
@@ -402,7 +461,7 @@ export function InvoicePage() {
             </h3>
           </div>
 
-          <div className='mt-6 grid gap-4 md:grid-cols-[1.4fr_0.9fr]'>
+          <div className='relative mt-6 grid items-start gap-4 md:grid-cols-[1.4fr_0.9fr] print:relative'>
             <div className='space-y-2 text-sm'>
               <p>
                 <span className='font-semibold'>
@@ -418,7 +477,7 @@ export function InvoicePage() {
               <p>Due Date : Fri 2 Oct 2026</p>
             </div>
 
-            <div className='space-y-2 text-sm'>
+            <div className='space-y-2 text-sm print:absolute print:top-0 print:right-0 print:w-[260px]'>
               <div className='grid grid-cols-[120px_1fr] gap-2'>
                 <span className='font-semibold'>NO</span>
                 <span>: {invoiceNo}</span>

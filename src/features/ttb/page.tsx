@@ -185,11 +185,10 @@ export function TtbPage() {
     }))
   }
 
-  const handleItemToggle = (itemKey: string, checked: boolean) => {
-    const row = ttbRows.find((item) => item.itemKey === itemKey)
+  const handleItemToggle = (row: TtbRow, checked: boolean) => {
     setSelectedQuantities((current) => ({
       ...current,
-      [itemKey]: checked ? (row?.quotationQty ?? 0) : 0,
+      [row.itemKey]: checked ? row.quotationQty : 0,
     }))
   }
 
@@ -266,7 +265,7 @@ export function TtbPage() {
       </Card>
 
       {quotation ? (
-        <div className='mx-auto max-w-7xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:border-0 print:p-0 print:shadow-none'>
+        <div className='mx-auto max-w-7xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:w-full print:max-w-none print:border-0 print:p-0 print:shadow-none'>
           <div className='mb-4 flex justify-end gap-2 print:hidden'>
             <Button onClick={handleSaveTtb}>
               <Save className='h-4 w-4' />
@@ -302,7 +301,7 @@ export function TtbPage() {
             />
           </div>
 
-          <div className='grid gap-6 border-b border-slate-300 py-4 text-xs text-slate-600 md:grid-cols-[1fr_1fr_365px]'>
+          <div className='grid gap-6 border-b border-slate-300 py-4 text-xs text-slate-600 md:grid-cols-[1fr_1fr_365px] print:grid-cols-[1fr_1fr_280px] print:gap-4 print:text-[10px]'>
             <div>
               <p className='font-semibold text-slate-900'>
                 Gd. One Pacific Place, Level 11-SCBD
@@ -317,14 +316,14 @@ export function TtbPage() {
               <p>Cinere Residence H1 No. 5</p>
               <p>Depok Regency Jawa Barat 16515</p>
             </div>
-            <div className='self-center border-2 border-slate-700 px-4 py-2 text-center'>
-              <h2 className='text-2xl font-black tracking-[0.08em] text-red-600 uppercase md:text-3xl'>
+            <div className='self-center border-2 border-slate-700 px-2 py-1 text-center'>
+              <h2 className='text-2xl font-black tracking-[0.08em] text-red-600 uppercase md:text-3xl print:text-lg print:tracking-[0.04em]'>
                 TANDA TERIMA BARANG
               </h2>
             </div>
           </div>
 
-          <div className='mt-6 grid grid-cols-1 gap-4 text-sm md:grid-cols-[1fr_365px]'>
+          <div className='mt-6 grid grid-cols-1 gap-4 text-sm md:grid-cols-[1fr_365px] print:grid-cols-[1fr_365px]'>
             <div className='border border-slate-700 p-3'>
               <p className='font-semibold'>Dikirimkan ke:</p>
               <p className='mt-1 pl-12 font-semibold'>{formInfo.pt || '-'}</p>
@@ -361,7 +360,7 @@ export function TtbPage() {
             <table className='w-full border-collapse text-left text-xs'>
               <thead className='bg-slate-100 text-slate-800'>
                 <tr>
-                  <th className='w-12 border border-slate-200 px-1 py-2 print:hidden'>
+                  <th className='w-10 border border-slate-200 px-1 py-2 print:hidden'>
                     Pilih
                   </th>
                   <th className='w-10 border border-slate-200 px-1 py-2'>No</th>
@@ -381,16 +380,12 @@ export function TtbPage() {
               <tbody>
                 {ttbRows.length > 0 ? (
                   ttbRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className={`align-top ${row.qty === 0 ? 'print:hidden' : ''}`}
-                    >
-                      <td className='w-12 border border-slate-200 px-1 py-2 text-center print:hidden'>
+                    <tr key={row.id} className='align-top'>
+                      <td className='w-10 border border-slate-200 px-1 py-2 text-center print:hidden'>
                         <Checkbox
                           checked={row.qty > 0}
-                          disabled={row.quotationQty === 0}
                           onCheckedChange={(checked) =>
-                            handleItemToggle(row.itemKey, checked === true)
+                            handleItemToggle(row, checked === true)
                           }
                           aria-label={`Pilih ${row.description}`}
                         />
@@ -417,7 +412,7 @@ export function TtbPage() {
                               event.target.value
                             )
                           }
-                          className='ml-auto h-8 w-20 text-right print:border-0'
+                          className='ml-auto h-8 w-20 text-right'
                           aria-label={`Qty ${row.description}`}
                         />
                         <span className='mt-1 block text-xs text-slate-500 print:hidden'>
@@ -434,7 +429,7 @@ export function TtbPage() {
                             handleNoteChange(row.itemKey, event.target.value)
                           }
                           placeholder='Catatan'
-                          className='h-8 min-w-32 print:border-0'
+                          className='h-8 min-w-32'
                           aria-label={`Notes ${row.description}`}
                         />
                       </td>
@@ -454,7 +449,7 @@ export function TtbPage() {
             </table>
           </div>
 
-          <div className='mt-8 grid gap-8 border-t border-slate-200 pt-6 md:grid-cols-[220px_1fr_300px] md:items-end'>
+          <div className='mt-8 grid gap-8 border-t border-slate-200 pt-6 md:grid-cols-[220px_1fr_300px] md:items-end print:grid-cols-[220px_1fr_300px] print:items-end'>
             <div className='min-w-48 text-left text-sm'>
               <p className='font-semibold'>Diterima Oleh,</p>
               <div className='mt-14 w-24 border-b border-slate-700' />
