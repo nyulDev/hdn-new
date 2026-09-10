@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -70,6 +71,7 @@ const emptyForm: FormData = {
   namaKapal: '',
   kontak: '',
   alamat: '',
+  bansos: false,
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -133,6 +135,7 @@ export function Customers() {
       namaKapal: c.namaKapal,
       kontak: c.kontak,
       alamat: c.alamat,
+      bansos: c.bansos,
     })
     setErrors({})
     setFormOpen(true)
@@ -184,7 +187,7 @@ export function Customers() {
     }
   }
 
-  const setField = (field: keyof FormData, value: string) => {
+  const setField = (field: keyof FormData, value: FormData[typeof field]) => {
     setForm((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
@@ -289,6 +292,7 @@ export function Customers() {
                   <TableHead>Nama Kapal</TableHead>
                   <TableHead>Kontak</TableHead>
                   <TableHead>Alamat</TableHead>
+                  <TableHead className='w-24 text-center'>Bansos</TableHead>
                   <TableHead className='w-20 text-center'>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -296,7 +300,7 @@ export function Customers() {
                 {loading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className='py-16 text-center text-muted-foreground'
                     >
                       Memuat data customer...
@@ -305,7 +309,7 @@ export function Customers() {
                 ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className='py-16 text-center text-muted-foreground'
                     >
                       {search
@@ -328,6 +332,11 @@ export function Customers() {
                       </TableCell>
                       <TableCell className='max-w-[200px] truncate text-muted-foreground'>
                         {c.alamat}
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <Badge variant={c.bansos ? 'default' : 'outline'}>
+                          {c.bansos ? 'ON' : 'OFF'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className='flex items-center justify-center gap-1'>
@@ -458,6 +467,24 @@ export function Customers() {
               {errors.alamat && (
                 <p className='text-xs text-destructive'>{errors.alamat}</p>
               )}
+            </div>
+
+            {/* Bansos */}
+            <div className='flex items-center justify-between rounded-md border p-3'>
+              <div className='space-y-0.5'>
+                <Label htmlFor='bansos' className='text-xs font-semibold'>
+                  Bansos
+                </Label>
+                <p className='text-xs text-muted-foreground'>
+                  Aktifkan status bantuan sosial customer
+                </p>
+              </div>
+              <Switch
+                id='bansos'
+                checked={form.bansos}
+                onCheckedChange={(checked) => setField('bansos', checked)}
+                aria-label='Status bansos'
+              />
             </div>
           </div>
 

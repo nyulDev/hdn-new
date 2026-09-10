@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search as SearchIcon } from 'lucide-react'
+import { getCustomers, type Customer } from '@/lib/api/customers'
 import {
   getEstimasiByNoQuo,
   getEstimasiList,
@@ -43,6 +44,29 @@ const getInvoiceNumber = (invoice: InvoiceRecord) => {
   return `${noQuo}-INV-${year}`
 }
 
+const normalizeCustomerValue = (value: unknown) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+
+const getInvoiceCustomer = (invoice: InvoiceRecord, customers: Customer[]) => {
+  const customerValues = [
+    invoice.formInfo?.customerId,
+    invoice.formInfo?.customer,
+    invoice.formInfo?.pt,
+    invoice.customerName,
+    invoice.judul,
+  ]
+    .map(normalizeCustomerValue)
+    .filter(Boolean)
+
+  return customers.find((customer) =>
+    [customer.id, customer.pt, customer.namaKapal]
+      .map(normalizeCustomerValue)
+      .some((value) => customerValues.includes(value))
+  )
+}
+
 type SalesRow = {
   id: number
   date: string
@@ -62,6 +86,7 @@ type SalesRow = {
 const toSalesRow = (
   invoice: InvoiceRecord,
   quotation: EstimasiFull | undefined,
+  customers: Customer[],
   index: number
 ): SalesRow => {
   const quotationData = quotation ?? invoice
@@ -75,9 +100,8 @@ const toSalesRow = (
   const grossProfit = totalAfterDiscount - actualPurchase
   const marketingFee = Math.max(grossProfit, 0) * 0.1
   const hsiShare = modalRequested * 0.08
-  const socialAid = parseQuotationNumber(
-    invoice.formInfo?.bansosAmount ?? invoice.costs?.bansosAmount
-  )
+  const customer = getInvoiceCustomer(invoice, customers)
+  const socialAid = customer?.bansos ? totalAfterDiscount * 0.05 : 0
   const netProfit = grossProfit - marketingFee - hsiShare - socialAid
 
   return {
@@ -101,6 +125,7 @@ const toSalesRow = (
 
 export function Penjualan() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [quotations, setQuotations] = useState<Record<string, EstimasiFull>>({})
   const [activeQuotationNumbers, setActiveQuotationNumbers] =
     useState<Set<string> | null>(null)
@@ -110,10 +135,12 @@ export function Penjualan() {
 
   useEffect(() => {
     const loadSalesData = async () => {
-      const [invoiceResult, quotationResult] = await Promise.allSettled([
-        getInvoices(),
-        getEstimasiList(),
-      ])
+      const [invoiceResult, quotationResult, customerResult] =
+        await Promise.allSettled([
+          getInvoices(),
+          getEstimasiList(),
+          getCustomers(),
+        ])
 
       if (invoiceResult.status === 'rejected') {
         setError('Data penjualan belum dapat dimuat.')
@@ -122,6 +149,9 @@ export function Penjualan() {
       }
 
       setInvoices(invoiceResult.value)
+      if (customerResult.status === 'fulfilled') {
+        setCustomers(customerResult.value)
+      }
 
       if (quotationResult.status === 'rejected') {
         setLoading(false)
@@ -162,6 +192,7 @@ export function Penjualan() {
           toSalesRow(
             invoice,
             quotations[String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')],
+            customers,
             index
           )
         )
@@ -172,7 +203,7 @@ export function Penjualan() {
             .toLowerCase()
             .includes(query)
         }),
-    [activeQuotationNumbers, invoices, quotations, search]
+    [activeQuotationNumbers, customers, invoices, quotations, search]
   )
 
   return (

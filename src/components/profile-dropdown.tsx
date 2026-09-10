@@ -22,8 +22,8 @@ export function ProfileDropdown() {
     ? `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim() ||
       auth.user.username ||
       auth.user.email
-    : 'satnaing'
-  const displayEmail = auth.user?.email ?? 'satnaingdev@gmail.com'
+    : 'Guest'
+  const displayEmail = auth.user?.email ?? 'Belum login'
   const initials = displayName
     .split(/\s+/)
     .map((part) => part[0])

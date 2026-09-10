@@ -14,6 +14,7 @@ router.get('/', async (req, res) => {
       namaKapal: c.nama_kapal,
       kontak: c.kontak,
       alamat: c.alamat,
+      bansos: c.bansos,
       createdAt: c.created_at,
     }));
     res.json(formatted);
@@ -25,15 +26,15 @@ router.get('/', async (req, res) => {
 
 // POST new customer
 router.post('/', async (req, res) => {
-  const { kode, pt, namaKapal, kontak, alamat } = req.body;
+  const { kode, pt, namaKapal, kontak, alamat, bansos = false } = req.body;
   try {
     if (!kode || !String(kode).trim()) {
       return res.status(400).json({ error: 'Customer ID is required' });
     }
 
     const newCustomer = await sql`
-      INSERT INTO customers (kode, pt, nama_kapal, kontak, alamat)
-      VALUES (${kode}, ${pt}, ${namaKapal}, ${kontak}, ${alamat})
+      INSERT INTO customers (kode, pt, nama_kapal, kontak, alamat, bansos)
+      VALUES (${kode}, ${pt}, ${namaKapal}, ${kontak}, ${alamat}, ${bansos})
       RETURNING *
     `;
     
@@ -44,6 +45,7 @@ router.post('/', async (req, res) => {
       namaKapal: c.nama_kapal,
       kontak: c.kontak,
       alamat: c.alamat,
+      bansos: c.bansos,
       createdAt: c.created_at,
     });
   } catch (error) {
@@ -55,11 +57,11 @@ router.post('/', async (req, res) => {
 // PUT update customer
 router.put('/:kode', async (req, res) => {
   const { kode } = req.params;
-  const { pt, namaKapal, kontak, alamat } = req.body;
+  const { pt, namaKapal, kontak, alamat, bansos = false } = req.body;
   try {
     const updated = await sql`
       UPDATE customers
-      SET pt = ${pt}, nama_kapal = ${namaKapal}, kontak = ${kontak}, alamat = ${alamat}
+      SET pt = ${pt}, nama_kapal = ${namaKapal}, kontak = ${kontak}, alamat = ${alamat}, bansos = ${bansos}
       WHERE kode = ${kode}
       RETURNING *
     `;
@@ -73,6 +75,7 @@ router.put('/:kode', async (req, res) => {
       namaKapal: c.nama_kapal,
       kontak: c.kontak,
       alamat: c.alamat,
+      bansos: c.bansos,
       createdAt: c.created_at,
     });
   } catch (error) {

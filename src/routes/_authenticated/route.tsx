@@ -4,7 +4,9 @@ import { AuthenticatedLayout } from '@/components/layout/authenticated-layout'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: ({ location }) => {
-    if (!useAuthStore.getState().auth.accessToken) {
+    const { accessToken, user } = useAuthStore.getState().auth
+    if (!accessToken || !user) {
+      useAuthStore.getState().auth.reset()
       throw redirect({
         to: '/sign-in',
         search: { redirect: location.href },

@@ -6,6 +6,7 @@ export interface Customer {
   namaKapal: string
   kontak: string
   alamat: string
+  bansos: boolean
   createdAt: string
 }
 

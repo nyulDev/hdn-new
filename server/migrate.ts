@@ -18,6 +18,12 @@ async function migrate() {
     `;
     console.log('Customers table created or already exists.');
 
+    await sql`
+      ALTER TABLE customers
+      ADD COLUMN IF NOT EXISTS bansos BOOLEAN NOT NULL DEFAULT FALSE;
+    `;
+    console.log('Customer bansos field created or already exists.');
+
     // Create estimasi table
     await sql`
       CREATE TABLE IF NOT EXISTS estimasi (
