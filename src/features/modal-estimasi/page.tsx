@@ -1064,7 +1064,7 @@ export function ModalEstimasi({
                     />
                   </div>
                   <div className='flex shrink-0 items-center gap-2'>
-                    <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
+                    <Label className='w-auto shrink-0 text-xs font-semibold text-muted-foreground'>
                       No. Quo
                     </Label>
                     <Input
