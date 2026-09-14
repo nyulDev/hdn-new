@@ -74,6 +74,7 @@ interface FormInfo {
   dept: string
   noQuo: string
   noRfs: string
+  subject: string
   supplyLocation: string
   sktd: boolean
   revisi: string
@@ -158,6 +159,7 @@ const defaultFormInfo: FormInfo = {
   dept: '',
   noQuo: '',
   noRfs: '',
+  subject: '',
   supplyLocation: 'JAKARTA',
   sktd: false,
   revisi: '0',
@@ -877,8 +879,8 @@ export function ModalEstimasi({
           </div>
         </div>
         {!actualMode && (
-          <div className='mb-4 rounded-md border bg-background p-4 shadow-sm'>
-            <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3'>
+          <div className='mb-4 rounded-md border bg-background p-3 shadow-sm'>
+            <div className='grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2 lg:grid-cols-3'>
               {/* Row 1 */}
               {!quotationMode && (
                 <div className='flex items-center gap-2'>
@@ -889,7 +891,7 @@ export function ModalEstimasi({
                     type='date'
                     value={formInfo.tanggal}
                     onChange={(e) => updateInfo('tanggal', e.target.value)}
-                    className='h-8 flex-1 text-xs'
+                    className='h-7 flex-1 text-xs'
                   />
                 </div>
               )}
@@ -901,7 +903,7 @@ export function ModalEstimasi({
                   <select
                     value={formInfo.pt}
                     onChange={(e) => handleCompanyChange(e.target.value)}
-                    className='h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs'
+                    className='h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs'
                   >
                     <option value=''>Pilih perusahaan</option>
                     {customerCompanies.map((pt) => (
@@ -921,7 +923,7 @@ export function ModalEstimasi({
                     value={formInfo.kapal}
                     onChange={(e) => updateInfo('kapal', e.target.value)}
                     disabled={!formInfo.pt}
-                    className='h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+                    className='h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-50'
                   >
                     <option value=''>Pilih kapal</option>
                     {customerShips.map((customer) => (
@@ -933,19 +935,6 @@ export function ModalEstimasi({
                 </div>
               )}
               {/* Row 2 */}
-              {!quotationMode && (
-                <div className='flex items-center gap-2'>
-                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    Dept
-                  </Label>
-                  <Input
-                    value={formInfo.dept}
-                    onChange={(e) => updateInfo('dept', e.target.value)}
-                    placeholder='Departemen'
-                    className='h-8 flex-1 text-xs'
-                  />
-                </div>
-              )}
               {quotationMode && (
                 <div className='col-span-full'>
                   {/* Satu baris: No. Quo | Range (%) | SKTD | Revisi */}
@@ -1062,61 +1051,85 @@ export function ModalEstimasi({
                 </div>
               )}
               {!quotationMode && (
-                <div className='flex items-center gap-2'>
-                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    No. Quo
-                  </Label>
-                  {/* Input nomor urut saja */}
-                  <Input
-                    value={noQuoNumber}
-                    onChange={(e) => setNoQuoNumber(e.target.value)}
-                    placeholder='0000'
-                    className='h-8 w-20 flex-none text-xs'
-                  />
-                  {/* Bagian read-only: -[R{n}]-PH-{DEPT}-{YEAR} */}
-                  <div className='flex items-center gap-0'>
-                    {formInfo.revisi && formInfo.revisi !== '0' && (
-                      <>
-                        <span className='text-xs text-muted-foreground'>-</span>
-                        <Input
-                          value={`R${formInfo.revisi}`}
-                          readOnly
-                          className='h-8 w-10 flex-none cursor-default border-dashed bg-amber-50 px-1 text-center text-xs text-amber-600 select-none focus-visible:ring-0'
-                        />
-                      </>
-                    )}
-                    <span className='text-xs text-muted-foreground'>-</span>
+                <div className='col-span-full flex min-w-0 items-center gap-5'>
+                  <div className='flex shrink-0 items-center gap-2'>
+                    <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
+                      Dept
+                    </Label>
                     <Input
-                      value='PH'
-                      readOnly
-                      className='h-8 w-10 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
-                    />
-                    <span className='text-xs text-muted-foreground'>-</span>
-                    <Input
-                      value={formInfo.dept.trim().toUpperCase() || 'HDN'}
-                      readOnly
-                      className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
-                    />
-                    <span className='text-xs text-muted-foreground'>-</span>
-                    <Input
-                      value={new Date().getFullYear()}
-                      readOnly
-                      className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                      value={formInfo.dept}
+                      onChange={(e) => updateInfo('dept', e.target.value)}
+                      placeholder='HDN'
+                      className='h-7 w-16 flex-none text-xs'
                     />
                   </div>
-                </div>
-              )}
-              {!quotationMode && (
-                <div className='flex items-center gap-2'>
-                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    No. RFS
-                  </Label>
-                  <Input
-                    value={formInfo.noRfs}
-                    onChange={(e) => updateInfo('noRfs', e.target.value)}
-                    placeholder='Nomor RFS'
-                    className='h-8 flex-1 text-xs'
-                  />
+                  <div className='flex shrink-0 items-center gap-2'>
+                    <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
+                      No. Quo
+                    </Label>
+                    <Input
+                      value={noQuoNumber}
+                      onChange={(e) => setNoQuoNumber(e.target.value)}
+                      placeholder='0000'
+                      className='h-8 w-20 flex-none text-xs'
+                    />
+                    <div className='flex items-center gap-0'>
+                      {formInfo.revisi && formInfo.revisi !== '0' && (
+                        <>
+                          <span className='text-xs text-muted-foreground'>
+                            -
+                          </span>
+                          <Input
+                            value={`R${formInfo.revisi}`}
+                            readOnly
+                            className='h-8 w-10 flex-none cursor-default border-dashed bg-amber-50 px-1 text-center text-xs text-amber-600 select-none focus-visible:ring-0'
+                          />
+                        </>
+                      )}
+                      <span className='text-xs text-muted-foreground'>-</span>
+                      <Input
+                        value='PH'
+                        readOnly
+                        className='h-8 w-10 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                      />
+                      <span className='text-xs text-muted-foreground'>-</span>
+                      <Input
+                        value={formInfo.dept.trim().toUpperCase() || 'HDN'}
+                        readOnly
+                        className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                      />
+                      <span className='text-xs text-muted-foreground'>-</span>
+                      <Input
+                        value={new Date().getFullYear()}
+                        readOnly
+                        className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                      />
+                    </div>
+                  </div>
+                  <div className='flex min-w-0 flex-1 items-center gap-3'>
+                    <div className='flex min-w-0 flex-1 items-center gap-2'>
+                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                        No. RFS
+                      </Label>
+                      <Input
+                        value={formInfo.noRfs}
+                        onChange={(e) => updateInfo('noRfs', e.target.value)}
+                        placeholder='Nomor RFS'
+                        className='h-7 min-w-0 flex-1 text-xs'
+                      />
+                    </div>
+                    <div className='flex min-w-0 flex-1 items-center gap-2'>
+                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                        Subject
+                      </Label>
+                      <Input
+                        value={formInfo.subject}
+                        onChange={(e) => updateInfo('subject', e.target.value)}
+                        placeholder='Subject'
+                        className='h-7 min-w-0 flex-1 text-xs'
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -2485,6 +2498,8 @@ function QuotationReport({
           <span>: {reportDate}</span>
           <span className='font-bold'>PAGE</span>
           <span>: 1</span>
+          <span className='font-bold'>SUBJECT</span>
+          <span>: {formInfo.subject || '-'}</span>
           <span className='font-bold'>SUPPLY LOCATION</span>
           <span>: {formInfo.supplyLocation || '-'}</span>
         </div>
