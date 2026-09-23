@@ -12,7 +12,6 @@ import {
   getEstimasiList,
   getEstimasiByNoQuo,
   updateEstimasi,
-  updateEstimasiByNoQuo,
   EstimasiList,
 } from '@/lib/api/estimasi'
 import { getNetProfitEstimatePct } from '@/lib/profit'
@@ -279,7 +278,7 @@ function Cell({
         ? 'text-center'
         : 'text-left'
 
-  const bgClass = ''
+  const bgClass = highlight === 'yellow' ? 'bg-yellow-50' : ''
 
   // Tampil formatted (titik ribuan) saat tidak sedang diedit
   const displayValue =
@@ -446,7 +445,10 @@ export function ModalEstimasi({
   }
 
   useEffect(() => {
-    console.log('[quotationDetails CHANGED]', JSON.stringify(quotationDetails?.note?.slice(0, 40)))
+    console.log(
+      '[quotationDetails CHANGED]',
+      JSON.stringify(quotationDetails?.note?.slice(0, 40))
+    )
   }, [quotationDetails])
 
   const getQuotationUnitPrice = (item: LineItem) => {
