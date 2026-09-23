@@ -116,7 +116,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST new estimasi
+// UPDATE estimasi by id
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { judul, formInfo, items, costs } = req.body;

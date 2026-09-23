@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
     const customers = await sql`SELECT * FROM customers ORDER BY id DESC`;
     // camelCase conversion
     const formatted = customers.map(c => ({
-      id: c.kode,
+      id: String(c.kode ?? '').trim(),
       pt: c.pt,
       namaKapal: c.nama_kapal,
       kontak: c.kontak,
@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
     
     const c = newCustomer[0];
     res.status(201).json({
-      id: c.kode,
+      id: String(c.kode ?? '').trim(),
       pt: c.pt,
       namaKapal: c.nama_kapal,
       kontak: c.kontak,
@@ -62,7 +62,7 @@ router.put('/:kode', async (req, res) => {
     const updated = await sql`
       UPDATE customers
       SET pt = ${pt}, nama_kapal = ${namaKapal}, kontak = ${kontak}, alamat = ${alamat}, bansos = ${bansos}
-      WHERE kode = ${kode}
+      WHERE TRIM(kode) = TRIM(${kode})
       RETURNING *
     `;
     if (updated.length === 0) {
@@ -70,7 +70,7 @@ router.put('/:kode', async (req, res) => {
     }
     const c = updated[0];
     res.json({
-      id: c.kode,
+      id: String(c.kode ?? '').trim(),
       pt: c.pt,
       namaKapal: c.nama_kapal,
       kontak: c.kontak,
@@ -88,7 +88,7 @@ router.put('/:kode', async (req, res) => {
 router.delete('/:kode', async (req, res) => {
   const { kode } = req.params;
   try {
-    const deleted = await sql`DELETE FROM customers WHERE kode = ${kode} RETURNING id`;
+    const deleted = await sql`DELETE FROM customers WHERE TRIM(kode) = TRIM(${kode}) RETURNING kode`;
     if (deleted.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
     }

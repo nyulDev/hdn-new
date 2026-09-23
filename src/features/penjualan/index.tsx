@@ -29,9 +29,6 @@ const formatDate = (value: unknown) => {
 }
 
 const getInvoiceNumber = (invoice: InvoiceRecord) => {
-  const rfsNumber = invoice.formInfo?.noRfs ?? invoice.formInfo?.noRFS
-  if (rfsNumber) return String(rfsNumber)
-
   const storedNumber =
     invoice.formInfo?.noInvoice ?? invoice.formInfo?.invoiceNo
   if (storedNumber) return String(storedNumber)
@@ -39,9 +36,7 @@ const getInvoiceNumber = (invoice: InvoiceRecord) => {
   const noQuo = String(
     invoice.formInfo?.noQuo ?? invoice.noQuo ?? 'XXX'
   ).replace(/\s+/g, '')
-  const year =
-    new Date(invoice.createdAt).getFullYear() || new Date().getFullYear()
-  return `${noQuo}-INV-${year}`
+  return noQuo.replace(/(-\d{4})$/, '-INV$1')
 }
 
 const normalizeCustomerValue = (value: unknown) =>

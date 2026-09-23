@@ -279,7 +279,7 @@ function Cell({
         ? 'text-center'
         : 'text-left'
 
-  const bgClass = highlight === 'yellow' ? 'bg-yellow-50' : ''
+  const bgClass = ''
 
   // Tampil formatted (titik ribuan) saat tidak sedang diedit
   const displayValue =
@@ -382,13 +382,11 @@ export function ModalEstimasi({
         status,
       }
       const saved =
-        quotationMode &&
-        savedList.some((estimasi) => estimasi.noQuo === formInfo.noQuo)
-          ? await updateEstimasiByNoQuo(formInfo.noQuo, saveData)
-          : !quotationMode && editingEstimasiId !== null
-            ? await updateEstimasi(editingEstimasiId, saveData)
-            : await saveEstimasi(saveData)
+        editingEstimasiId !== null
+          ? await updateEstimasi(editingEstimasiId, saveData)
+          : await saveEstimasi(saveData)
       alert('Berhasil disimpan')
+      setEditingEstimasiId(saved.id)
       setSavedList((current) => {
         const existing = current.some((estimasi) => estimasi.id === saved.id)
         return existing
@@ -398,8 +396,6 @@ export function ModalEstimasi({
           : [saved, ...current]
       })
       setSaveDialogOpen(false)
-      setJudulEstimasi('')
-      setEditingEstimasiId(null)
     } catch (e) {
       alert('Gagal menyimpan: ' + (e as Error).message)
     }
@@ -427,6 +423,11 @@ export function ModalEstimasi({
       setCosts(data.costs || defaultCosts)
       // Persentase Estimasi (%) diambil dari Net Profit estimasi persentase
       // pada page Profit berdasarkan No. Quo
+      setQuotationDetails(
+        loadedFormInfo.quotationDetails != null
+          ? loadedFormInfo.quotationDetails
+          : defaultQuotationDetails
+      )
       setEstimasiPct(
         getNetProfitEstimatePct({
           formInfo: loadedFormInfo,
@@ -443,6 +444,10 @@ export function ModalEstimasi({
       setLoadingQuotation(false)
     }
   }
+
+  useEffect(() => {
+    console.log('[quotationDetails CHANGED]', JSON.stringify(quotationDetails?.note?.slice(0, 40)))
+  }, [quotationDetails])
 
   const getQuotationUnitPrice = (item: LineItem) => {
     if (item.unitPriceQuo?.trim()) return parseNum(item.unitPriceQuo)
@@ -514,7 +519,6 @@ export function ModalEstimasi({
   }
 
   const resetAll = useCallback(() => {
-    setEditingEstimasiId(null)
     setFormInfo(defaultFormInfo)
     setItems([])
     setCosts({
@@ -535,13 +539,20 @@ export function ModalEstimasi({
     setEstimasiPct('')
     setQuotationDiscountPct('10')
     setQuotationPpnPct('11')
-    setQuotationDetails(defaultQuotationDetails)
     setShowQuotationTable(!quotationMode)
   }, [quotationMode])
 
   useEffect(() => {
     resetAll()
-  }, [resetAll])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotationMode])
+
+  const handleReset = () => {
+    setEditingEstimasiId(null)
+    setJudulEstimasi('')
+    setQuotationDetails(defaultQuotationDetails)
+    resetAll()
+  }
 
   const updateCost = (field: keyof CostConfig, value: string) =>
     setCosts((prev) => ({ ...prev, [field]: value }))
@@ -622,7 +633,7 @@ export function ModalEstimasi({
               variant='outline'
               size='sm'
               className='gap-1.5'
-              onClick={resetAll}
+              onClick={handleReset}
             >
               <RefreshCw className='h-3.5 w-3.5' />
               Reset
@@ -676,7 +687,11 @@ export function ModalEstimasi({
                 variant='outline'
                 size='sm'
                 className='gap-1.5'
-                onClick={() => setSaveDialogOpen(true)}
+                onClick={() =>
+                  editingEstimasiId !== null
+                    ? void handleSave()
+                    : setSaveDialogOpen(true)
+                }
               >
                 <Save className='h-3.5 w-3.5' />
                 Simpan

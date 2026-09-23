@@ -40,6 +40,19 @@ const getTodayInputDate = () => {
   return `${today.getFullYear()}-${month}-${day}`
 }
 
+const getTtbNoPo = (noQuo: unknown) => {
+  if (typeof window === 'undefined' || !String(noQuo ?? '').trim()) return ''
+
+  try {
+    const drafts = JSON.parse(
+      window.localStorage.getItem('ttb-drafts') || '{}'
+    ) as Record<string, { noPo?: string }>
+    return drafts[String(noQuo).trim()]?.noPo ?? ''
+  } catch {
+    return ''
+  }
+}
+
 type InvoiceRow = {
   id: number
   itemKey: string
@@ -121,7 +134,7 @@ export function InvoicePage() {
       setSelectedSavedInvoiceId(null)
       setLoadedInvoice(data)
       setSelectedQuantities({})
-      setNoPo(data.formInfo?.noPo ?? data.formInfo?.noPO ?? '')
+      setNoPo(getTtbNoPo(data.formInfo?.noQuo ?? noQuo))
       setLocation(data.formInfo?.supplyLocation || 'PLTU Suralaya')
       setInvoiceDate(data.formInfo?.invoiceDate || getTodayInputDate())
       setNoQuoInput(data.formInfo?.noQuo ?? noQuo)
@@ -152,7 +165,7 @@ export function InvoicePage() {
       )
     )
     setNoQuoInput(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
-    setNoPo(invoice.formInfo?.noPo ?? invoice.formInfo?.noPO ?? '')
+    setNoPo(getTtbNoPo(invoice.formInfo?.noQuo ?? invoice.noQuo))
     setLocation(invoice.formInfo?.supplyLocation || 'PLTU Suralaya')
     setInvoiceDate(
       invoice.formInfo?.invoiceDate ||
@@ -260,7 +273,13 @@ export function InvoicePage() {
   const previewPpn = previewDpp * (ppnPct / 100)
   const previewTotalInvoice = previewDpp + previewPpn
   const invoiceNo = loadedInvoice
-    ? `${(loadedInvoice.formInfo?.noQuo || 'XXX').replace(/\s+/g, '')}-INV-${new Date().getFullYear()}`
+    ? (() => {
+        const noQuo = (loadedInvoice.formInfo?.noQuo || 'XXX').replace(
+          /\s+/g,
+          ''
+        )
+        return noQuo.replace(/(-\d{4})$/, '-INV$1')
+      })()
     : 'XXX-INV-2026'
   const customer = customers.find(
     (item) => item.pt === loadedInvoice?.formInfo?.pt
@@ -486,9 +505,9 @@ export function InvoicePage() {
                   :{' '}
                   <Input
                     value={noPo}
-                    onChange={(event) => setNoPo(event.target.value)}
-                    placeholder='Ketik No. PO'
-                    className='inline-flex h-8 w-64 print:hidden'
+                    readOnly
+                    placeholder='No. PO dari TTB'
+                    className='inline-flex h-8 w-64 bg-muted print:hidden'
                     aria-label='No. PO'
                   />
                   <span className='hidden print:inline'>{noPo || '-'}</span>

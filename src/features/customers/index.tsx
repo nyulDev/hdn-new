@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import {
   Building2,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   Plus,
   Search as SearchIcon,
@@ -80,6 +82,8 @@ export function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     loadCustomers()
@@ -117,6 +121,13 @@ export function Customers() {
         c.alamat.toLowerCase().includes(q)
     )
   }, [customers, search])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const paginatedCustomers = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [currentPage, filtered, pageSize]
+  )
 
   // ── open add ──
   const openAdd = () => {
@@ -176,11 +187,12 @@ export function Customers() {
 
   // ── delete ──
   const handleDelete = async () => {
-    if (!deleteTarget) return
+    const target = deleteTarget
+    if (!target) return
+    setDeleteTarget(null)
     try {
-      await deleteCustomer(deleteTarget.id)
-      setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id))
-      setDeleteTarget(null)
+      await deleteCustomer(target.id)
+      setCustomers((prev) => prev.filter((c) => c.id !== target.id))
     } catch (error) {
       console.error('Delete failed:', error)
       alert('Gagal menghapus data')
@@ -277,7 +289,10 @@ export function Customers() {
                 <Input
                   placeholder='Cari customer...'
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setPage(1)
+                  }}
                   className='h-8 pl-8 text-xs'
                 />
               </div>
@@ -318,7 +333,7 @@ export function Customers() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((c) => (
+                  paginatedCustomers.map((c) => (
                     <TableRow key={c.id} className='hover:bg-muted/40'>
                       <TableCell>
                         <Badge variant='outline' className='font-mono text-xs'>
@@ -363,6 +378,60 @@ export function Customers() {
                 )}
               </TableBody>
             </Table>
+            {!loading && filtered.length > 0 && (
+              <div className='flex flex-col gap-3 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between'>
+                <p className='text-muted-foreground'>
+                  Menampilkan {(currentPage - 1) * pageSize + 1}-
+                  {Math.min(currentPage * pageSize, filtered.length)} dari{' '}
+                  {filtered.length} data
+                </p>
+                <div className='flex items-center justify-between gap-3 sm:justify-end'>
+                  <label className='flex items-center gap-2 text-muted-foreground'>
+                    <span className='whitespace-nowrap'>Baris per halaman</span>
+                    <select
+                      value={pageSize}
+                      onChange={(event) => {
+                        setPageSize(Number(event.target.value))
+                        setPage(1)
+                      }}
+                      className='h-8 rounded-md border bg-background px-2 text-sm text-foreground'
+                      aria-label='Baris per halaman'
+                    >
+                      {[10, 20, 50].map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className='flex items-center gap-1'>
+                    <Button
+                      variant='outline'
+                      size='icon'
+                      className='h-8 w-8'
+                      onClick={() => setPage((value) => value - 1)}
+                      disabled={currentPage === 1}
+                      aria-label='Halaman sebelumnya'
+                    >
+                      <ChevronLeft className='h-4 w-4' />
+                    </Button>
+                    <span className='min-w-20 text-center text-sm font-medium'>
+                      Halaman {currentPage} dari {pageCount}
+                    </span>
+                    <Button
+                      variant='outline'
+                      size='icon'
+                      className='h-8 w-8'
+                      onClick={() => setPage((value) => value + 1)}
+                      disabled={currentPage === pageCount}
+                      aria-label='Halaman berikutnya'
+                    >
+                      <ChevronRight className='h-4 w-4' />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </Main>
@@ -516,7 +585,9 @@ export function Customers() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+              Batal
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className='text-destructive-foreground bg-destructive hover:bg-destructive/90'

@@ -431,6 +431,9 @@ export function ModalEstimasi({
         ...(data.costs || {}),
         otherCosts: data.costs?.otherCosts ?? [],
       })
+      if (loadedFormInfo.quotationDetails != null) {
+        setQuotationDetails(loadedFormInfo.quotationDetails)
+      }
       // Persentase Estimasi (%) diambil dari Net Profit estimasi persentase
       // pada page Profit berdasarkan No. Quo
       setEstimasiPct(

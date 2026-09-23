@@ -109,6 +109,7 @@ export function TtbPage() {
             notes?: Record<string, string>
             date?: string
             location?: string
+            noPo?: string
           }
         >
         const draft = drafts[quotationNoQuo]
@@ -116,14 +117,26 @@ export function TtbPage() {
         setNotes(draft?.notes ?? {})
         setTtbDate(draft?.date ?? toInputDate(data.formInfo?.tanggal))
         setLocation(draft?.location ?? data.formInfo?.supplyLocation ?? '')
+        setInvoiceNoPo(draft?.noPo ?? '')
       } catch {
         setSelectedQuantities({})
         setNotes({})
         setTtbDate(toInputDate(data.formInfo?.tanggal))
         setLocation(data.formInfo?.supplyLocation ?? '')
       }
+      const draftNoPo = (() => {
+        try {
+          const drafts = JSON.parse(
+            window.localStorage.getItem(ttbStorageKey) || '{}'
+          ) as Record<string, { noPo?: string }>
+          return drafts[quotationNoQuo]?.noPo
+        } catch {
+          return undefined
+        }
+      })()
       setInvoiceNoPo(
-        invoiceFormInfo.noPo ??
+        draftNoPo ??
+          invoiceFormInfo.noPo ??
           invoiceFormInfo.noPO ??
           data.formInfo?.noPo ??
           data.formInfo?.noPO ??
@@ -147,7 +160,8 @@ export function TtbPage() {
 
   const formInfo = quotation?.formInfo ?? {}
   const items = quotation?.items ?? []
-  const ttbNumber = formInfo.noTtb || `TTB-${formInfo.noQuo || 'XXXX'}`
+  const ttbNumber =
+    formInfo.noTtb || (formInfo.noQuo || 'XXXX').replace(/(-\d{4})$/, '-TTB$1')
   const noRfs = invoiceNoRfs || formInfo.noRfs || formInfo.noRFS || '-'
   const getItemKey = (item: Record<string, any>, index: number) =>
     String(
@@ -209,6 +223,7 @@ export function TtbPage() {
         notes,
         date: ttbDate,
         location,
+        noPo: invoiceNoPo,
       }
       window.localStorage.setItem(ttbStorageKey, JSON.stringify(drafts))
       alert('TTB berhasil disimpan.')
@@ -327,7 +342,16 @@ export function TtbPage() {
             <div className='border border-slate-700 p-3'>
               <p className='font-semibold'>Dikirimkan ke:</p>
               <p className='mt-1 pl-12 font-semibold'>{formInfo.pt || '-'}</p>
-              <p className='pl-12'>{location || '-'}</p>
+              <span className='flex items-center pl-12'>
+                <Input
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  placeholder='Masukkan lokasi...'
+                  className='h-6 border-0 border-b border-dashed border-slate-400 px-0 text-sm shadow-none focus-visible:ring-0 print:hidden'
+                  aria-label='Lokasi pengiriman'
+                />
+                <span className='hidden print:inline'>{location || '-'}</span>
+              </span>
               <p className='pl-12'>{formInfo.kapal || '-'}</p>
               <p className='pl-12'>{noRfs}</p>
             </div>
@@ -350,8 +374,20 @@ export function TtbPage() {
                 <p className='mt-2 text-xs'>{ttbNumber}</p>
               </div>
               <div className='col-span-2 border-t border-slate-700 p-2 text-left'>
-                <span className='font-semibold'>No. PO:</span>{' '}
-                {invoiceNoPo || '-'}
+                <label className='font-semibold' htmlFor='ttb-no-po'>
+                  No. PO:
+                </label>{' '}
+                <Input
+                  id='ttb-no-po'
+                  value={invoiceNoPo}
+                  onChange={(event) => setInvoiceNoPo(event.target.value)}
+                  placeholder='Ketik No. PO'
+                  className='inline-flex h-6 w-48 border-0 border-b border-dashed border-slate-400 px-1 text-xs shadow-none focus-visible:ring-0 print:hidden'
+                  aria-label='Nomor PO'
+                />
+                <span className='hidden print:inline'>
+                  {invoiceNoPo || '-'}
+                </span>
               </div>
             </div>
           </div>
