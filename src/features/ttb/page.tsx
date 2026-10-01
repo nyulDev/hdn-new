@@ -465,9 +465,10 @@ export function TtbPage() {
                             handleNoteChange(row.itemKey, event.target.value)
                           }
                           placeholder='Catatan'
-                          className='h-8 min-w-32'
+                          className='h-8 min-w-32 print:hidden'
                           aria-label={`Notes ${row.description}`}
                         />
+                        <span className='hidden print:inline'>{row.note}</span>
                       </td>
                     </tr>
                   ))

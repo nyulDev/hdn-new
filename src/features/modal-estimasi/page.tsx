@@ -2217,6 +2217,7 @@ export function ModalEstimasi({
               quotationPpn={quotationPpn}
               quotationTotal={effectiveQuotationTotal}
               quotationPpnPct={quotationPpnPct}
+              quotationDiscountPct={quotationDiscountPct}
               customers={customers}
             />
           ) : (
@@ -2422,6 +2423,7 @@ function QuotationReport({
   quotationPpn,
   quotationTotal,
   quotationPpnPct,
+  quotationDiscountPct,
   customers,
 }: {
   formInfo: FormInfo
@@ -2434,6 +2436,7 @@ function QuotationReport({
   quotationPpn: number
   quotationTotal: number
   quotationPpnPct: string
+  quotationDiscountPct: string
   customers: Customer[]
 }) {
   const reportDate = formInfo.tanggal
@@ -2444,7 +2447,10 @@ function QuotationReport({
       })
     : '-'
 
-  const customer = customers.find((c) => c.pt === formInfo.pt)
+  const customer =
+    customers.find(
+      (c) => c.pt === formInfo.pt && c.namaKapal === formInfo.kapal
+    ) ?? customers.find((c) => c.pt === formInfo.pt)
 
   return (
     <div className='space-y-5 bg-white p-2 text-slate-900 print:p-0'>
@@ -2536,7 +2542,14 @@ function QuotationReport({
               <tr key={item.id} className='border-b'>
                 <td className='px-1.5 py-1'>{item.no}</td>
                 <td className='px-1.5 py-1'>{item.pn}</td>
-                <td className='px-1.5 py-1'>{item.description}</td>
+                <td className='px-1.5 py-1'>
+                  <div>{item.description}</div>
+                  {item.note && (
+                    <div className='text-[11px] italic text-red-500'>
+                      {item.note}
+                    </div>
+                  )}
+                </td>
                 <td className='px-1.5 py-1'>
                   {item.qty} {item.unit}
                 </td>
@@ -2569,7 +2582,7 @@ function QuotationReport({
         </div>
         <div className='self-start'>
           <ReportRow label='Sub Total' value={quotationSubtotal} />
-          <ReportRow label='Discount' value={-quotationDiscount} />
+          <ReportRow label={`Discount (${quotationDiscountPct}%)`} value={-quotationDiscount} />
           <ReportRow
             label='Total after discount'
             value={quotationAfterDiscount}
