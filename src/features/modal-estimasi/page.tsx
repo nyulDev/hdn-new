@@ -54,6 +54,7 @@ interface LineItem {
   unitPrice: string
   amount: number
   unitPriceActual?: string
+  discActual?: string
   amountActual?: number
   actualPriceVariants?: Array<{
     toko: string
@@ -526,6 +527,20 @@ export function ModalEstimasi({
           parseNum(actualQty) * parseNum(updated.unitPriceActual ?? '') +
           (hasVariants ? variantTotal : 0)
 
+        // Apply disc to amountActual
+        const discRaw = (updated.discActual ?? '').trim()
+        if (discRaw) {
+          const baseActual =
+            parseNum(actualQty) * parseNum(updated.unitPriceActual ?? '') +
+            (hasVariants ? variantTotal : 0)
+          if (discRaw.endsWith('%')) {
+            const pct = parseNum(discRaw.replace('%', ''))
+            updated.amountActual = baseActual * (1 - pct / 100)
+          } else {
+            updated.amountActual = Math.max(0, baseActual - parseNum(discRaw))
+          }
+        }
+
         updated.amountQuo =
           parseNum(updated.qty) * parseNum(updated.unitPriceQuo ?? '')
         return updated
@@ -549,6 +564,7 @@ export function ModalEstimasi({
       unitPrice: '',
       amount: 0,
       unitPriceActual: '',
+      discActual: '',
       amountActual: 0,
       toko: '',
       unitPriceQuo: '',
@@ -605,12 +621,24 @@ export function ModalEstimasi({
           return sum + parseNum(variantQty) * parseNum(variant.price)
         }, 0)
 
+        const baseActual =
+          parseNum(actualQty) * parseNum(item.unitPriceActual ?? '') +
+          variantTotal
+        const discRaw = (item.discActual ?? '').trim()
+        let finalAmountActual = baseActual
+        if (discRaw) {
+          if (discRaw.endsWith('%')) {
+            const pct = parseNum(discRaw.replace('%', ''))
+            finalAmountActual = baseActual * (1 - pct / 100)
+          } else {
+            finalAmountActual = Math.max(0, baseActual - parseNum(discRaw))
+          }
+        }
+
         return {
           ...item,
           actualPriceVariants: currentVariants,
-          amountActual:
-            parseNum(actualQty) * parseNum(item.unitPriceActual ?? '') +
-            variantTotal,
+          amountActual: finalAmountActual,
         }
       })
     )
@@ -751,13 +779,13 @@ export function ModalEstimasi({
     'Unit Price Estimasi',
     'Amount Estimasi',
     ...(actualMode
-      ? ['Qty Aktual', 'Satuan Aktual', 'Unit Price Aktual', 'Amount Aktual']
+      ? ['Qty Aktual', 'Satuan Aktual', 'Unit Price Aktual', 'Disc', 'Amount Aktual']
       : []),
     ...(!quotationMode ? ['Toko'] : []),
     ...(quotationMode ? ['Unit Price Quotation', 'Amount Quotation'] : []),
     '',
   ]
-  const tableColumnCount = quotationMode ? 10 : actualMode ? 13 : 9
+  const tableColumnCount = quotationMode ? 10 : actualMode ? 14 : 9
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1141,11 +1169,11 @@ export function ModalEstimasi({
         {/* ── Spreadsheet container ── */}
         <div className='overflow-x-auto rounded-md border bg-background text-xs shadow-sm'>
           <QuotationModeContext.Provider value={quotationMode}>
-            <table className='w-full min-w-175 border-collapse'>
+            <table className={['w-full border-collapse', actualMode ? 'min-w-[1500px]' : 'min-w-175'].join(' ')}>
               <colgroup>
                 <col className='w-8' />
                 <col className='w-36' />
-                <col />
+                <col className={actualMode ? '' : ''} />
                 <col className='w-14' />
                 <col className='w-12' />
                 <col className='w-28' />
@@ -1155,6 +1183,7 @@ export function ModalEstimasi({
                     <col className='w-14' />
                     <col className='w-12' />
                     <col className='w-28' />
+                    <col className='w-20' />
                     <col className='w-28' />
                   </>
                 )}
@@ -1199,7 +1228,7 @@ export function ModalEstimasi({
                         placeholder='P/N'
                       />
                     </td>
-                    <td className='border-r py-0.5'>
+                    <td className={['border-r py-0.5', actualMode ? 'min-w-[400px]' : ''].join(' ')}>
                       <Cell
                         value={item.description}
                         onChange={(v) => updateItem(item.id, 'description', v)}
@@ -1338,6 +1367,17 @@ export function ModalEstimasi({
                             </button>
                           </div>
                         </td>
+                        <td className='border-r py-0.5 align-top'>
+                          <Cell
+                            value={item.discActual ?? ''}
+                            onChange={(v) =>
+                              updateItem(item.id, 'discActual', v)
+                            }
+                            placeholder='0 / 0%'
+                            align='center'
+                            className='w-full'
+                          />
+                        </td>
                         <td className='border-r py-0.5'>
                           <Cell
                             value={fmt(item.amountActual ?? 0)}
@@ -1437,6 +1477,7 @@ export function ModalEstimasi({
                       <td className='border-r' />
                       {actualMode && (
                         <>
+                          <td className='border-r' />
                           <td className='border-r' />
                           <td className='border-r' />
                           <td className='border-r' />
@@ -2225,6 +2266,7 @@ export function ModalEstimasi({
               formInfo={formInfo}
               items={items}
               costs={costs}
+              actualMode={actualMode}
               totalModalSparepart={totalModalSparepart}
               discountAmt={discountAmt}
               bankChargeIdr={bankChargeIdr}
@@ -2264,6 +2306,7 @@ function EstimasiReport({
   formInfo,
   items,
   costs,
+  actualMode = false,
   totalModalSparepart,
   discountAmt,
   bankChargeIdr,
@@ -2283,6 +2326,7 @@ function EstimasiReport({
   formInfo: FormInfo
   items: LineItem[]
   costs: CostConfig
+  actualMode?: boolean
   totalModalSparepart: number
   discountAmt: number
   bankChargeIdr: number
@@ -2322,15 +2366,27 @@ function EstimasiReport({
       <table className='w-full border-collapse text-xs'>
         <thead>
           <tr className='border-y bg-slate-100'>
-            {[
-              'No',
-              'Kode IMPA',
-              'Description',
-              'Qty',
-              'Nama Toko',
-              'Unit Price',
-              'Amount',
-            ].map((header) => (
+            {(actualMode
+              ? [
+                  'No',
+                  'Kode IMPA',
+                  'Description',
+                  'Qty Aktual',
+                  'Unit Price Aktual',
+                  'Disc',
+                  'Amount Aktual',
+                  'Toko',
+                ]
+              : [
+                  'No',
+                  'Kode IMPA',
+                  'Description',
+                  'Qty',
+                  'Nama Toko',
+                  'Unit Price',
+                  'Amount',
+                ]
+            ).map((header) => (
               <th
                 key={header}
                 className='border-r px-1.5 py-1 text-left last:border-r-0'
@@ -2341,21 +2397,49 @@ function EstimasiReport({
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
-            <tr key={item.id} className='border-b'>
-              <td className='px-1.5 py-1'>{item.no}</td>
-              <td className='px-1.5 py-1'>{item.pn}</td>
-              <td className='px-1.5 py-1'>{item.description}</td>
-              <td className='px-1.5 py-1'>
-                {item.qty} {item.unit}
-              </td>
-              <td className='px-1.5 py-1'>{item.toko || '-'}</td>
-              <td className='px-1.5 py-1 text-right'>
-                {fmt(parseNum(item.unitPrice))}
-              </td>
-              <td className='px-1.5 py-1 text-right'>{fmt(item.amount)}</td>
-            </tr>
-          ))}
+          {items.map((item) =>
+            actualMode ? (
+              <tr key={item.id} className='border-b'>
+                <td className='px-1.5 py-1'>{item.no}</td>
+                <td className='px-1.5 py-1'>{item.pn}</td>
+                <td className='px-1.5 py-1'>
+                  <div>{item.description}</div>
+                  {item.note && (
+                    <div className='text-[11px] italic text-red-500'>
+                      {item.note}
+                    </div>
+                  )}
+                </td>
+                <td className='px-1.5 py-1'>
+                  {item.qtyActual || item.qty} {item.unitActual || item.unit}
+                </td>
+                <td className='px-1.5 py-1 text-right'>
+                  {fmt(parseNum(item.unitPriceActual ?? ''))}
+                </td>
+                <td className='px-1.5 py-1 text-center'>
+                  {item.discActual || '-'}
+                </td>
+                <td className='px-1.5 py-1 text-right'>
+                  {fmt(item.amountActual ?? 0)}
+                </td>
+                <td className='px-1.5 py-1'>{item.toko || '-'}</td>
+              </tr>
+            ) : (
+              <tr key={item.id} className='border-b'>
+                <td className='px-1.5 py-1'>{item.no}</td>
+                <td className='px-1.5 py-1'>{item.pn}</td>
+                <td className='px-1.5 py-1'>{item.description}</td>
+                <td className='px-1.5 py-1'>
+                  {item.qty} {item.unit}
+                </td>
+                <td className='px-1.5 py-1'>{item.toko || '-'}</td>
+                <td className='px-1.5 py-1 text-right'>
+                  {fmt(parseNum(item.unitPrice))}
+                </td>
+                <td className='px-1.5 py-1 text-right'>{fmt(item.amount)}</td>
+              </tr>
+            )
+          )}
         </tbody>
       </table>
       <div className='grid gap-5 text-xs md:grid-cols-2'>
