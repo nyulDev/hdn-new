@@ -60,6 +60,23 @@ router.get('/', async (req, res) => {
       ORDER BY no_quo, updated_at DESC
     `
 
+    // Use the separately saved Modal Aktual total, not the invoice amount.
+    const actualRows = await sql`
+      SELECT DISTINCT ON (form_info->>'noQuo')
+        form_info->>'noQuo' AS no_quo,
+        form_info->>'modalAktualTotal' AS modal_aktual_total,
+        form_info->>'modalAktualSubtotal' AS modal_aktual_subtotal,
+        costs->>'investorPct' AS investor_pct
+      FROM estimasi
+      WHERE form_info->>'noQuo' IS NOT NULL
+        AND form_info->>'noQuo' != ''
+        AND (
+          form_info->>'modalAktualTotal' IS NOT NULL
+          OR form_info->>'modalAktualSubtotal' IS NOT NULL
+        )
+      ORDER BY form_info->>'noQuo', updated_at DESC
+    `
+
     // All saved notes
     const notesRows = await sql`SELECT no_quo, keterangan, status, updated_at FROM lap_bulanan_notes`
 
@@ -68,6 +85,12 @@ router.get('/', async (req, res) => {
     for (const inv of invoiceRows) {
       const key = String(inv.no_quo ?? '').trim()
       if (key) invoiceByNoQuo.set(key, inv)
+    }
+
+    const actualByNoQuo = new Map<string, (typeof actualRows)[number]>()
+    for (const actual of actualRows) {
+      const key = String(actual.no_quo ?? '').trim()
+      if (key) actualByNoQuo.set(key, actual)
     }
 
     const notesByNoQuo = new Map<string, { keterangan: string; status: string; updated_at: Date }>()
@@ -97,7 +120,21 @@ router.get('/', async (req, res) => {
       }
 
       const inv = invoiceByNoQuo.get(noQuo)
-      const aktual = inv ? Number(inv.amount ?? 0) : 0
+      const actual = actualByNoQuo.get(noQuo)
+      const storedActualTotal = actual?.modal_aktual_total
+      const hasStoredActualTotal =
+        storedActualTotal !== null &&
+        storedActualTotal !== undefined &&
+        String(storedActualTotal).trim() !== ''
+      const legacySubtotal = Number(actual?.modal_aktual_subtotal ?? 0)
+      const investorPct = Number(actual?.investor_pct ?? 0)
+      const aktual = !actual
+        ? 0
+        : hasStoredActualTotal && Number.isFinite(Number(storedActualTotal))
+          ? Number(storedActualTotal)
+          : Number.isFinite(legacySubtotal) && Number.isFinite(investorPct)
+            ? legacySubtotal * (1 + investorPct / 100)
+            : 0
 
       // Hanya tampilkan No. Invoice jika invoice benar-benar sudah tersimpan
       const noInvoice = inv

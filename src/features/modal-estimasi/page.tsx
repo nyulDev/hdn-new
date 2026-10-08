@@ -566,8 +566,12 @@ export function ModalEstimasi({
               quotationPpnPct,
             }
           : actualMode
-            ? { ...formInfo, modalAktualSubtotal: subTotal }
-            : formInfo,
+              ? {
+                  ...formInfo,
+                  modalAktualSubtotal: subTotal,
+                  modalAktualTotal: grandTotal,
+                }
+              : formInfo,
         items,
         costs,
         status,
