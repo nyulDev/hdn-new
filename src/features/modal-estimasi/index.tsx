@@ -5,7 +5,7 @@ import {
   useCallback,
   useEffect,
 } from 'react'
-import { Plus, Trash2, Printer, RefreshCw, Save } from 'lucide-react'
+import { Plus, Trash2, Printer, RefreshCw, Save, Search as SearchIcon } from 'lucide-react'
 import { getCustomers, Customer } from '@/lib/api/customers'
 import {
   saveEstimasi,
@@ -319,6 +319,111 @@ export function ModalEstimasi({
   const [costs, setCosts] = useState<CostConfig>(defaultCosts)
   const [customers, setCustomers] = useState<Customer[]>([])
 
+  // ── RFS Vendor Analytic Search ──
+  const [rfsHistory, setRfsHistory] = useState<any[]>([])
+  const [rfsDialogOpen, setRfsDialogOpen] = useState(false)
+  const [selectedRfsSearch, setSelectedRfsSearch] = useState('')
+  const [rfsFilterQuery, setRfsFilterQuery] = useState('')
+
+  const loadRfsHistory = useCallback(() => {
+    try {
+      const raw = localStorage.getItem('vendorAnalyticHistory')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          setRfsHistory(parsed)
+          return parsed
+        }
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load vendorAnalyticHistory:', e)
+    }
+    setRfsHistory([])
+    return []
+  }, [])
+
+  useEffect(() => {
+    loadRfsHistory()
+  }, [loadRfsHistory])
+
+  const handleApplyRfs = (doc: any) => {
+    if (!doc) return
+
+    // 1. Set No. RFS di formInfo
+    setFormInfo((prev) => ({
+      ...prev,
+      noRfs: doc.projectName || prev.noRfs,
+    }))
+
+    // 2. Set Kurs USD jika ada
+    if (doc.usdRate) {
+      setCosts((prev) => ({
+        ...prev,
+        usdRate: String(doc.usdRate),
+      }))
+    }
+
+    // 3. Tarik items dari vendor analytic
+    if (Array.isArray(doc.items) && doc.items.length > 0) {
+      const rate = parseNum(doc.usdRate) || parseNum(costs.usdRate) || 17500
+      const newItems: LineItem[] = doc.items.map((item: any, idx: number) => {
+        const selIdx =
+          typeof item.selectedVendor === 'number' && item.selectedVendor >= 0
+            ? item.selectedVendor
+            : null
+
+        let unitPriceIdr = 0
+
+        if (selIdx !== null && item.vendorPrices?.[selIdx]) {
+          const vp = item.vendorPrices[selIdx]
+          const usd = parseNum(vp?.usd)
+          if (usd > 0) {
+            unitPriceIdr = Math.round(usd * rate)
+          } else if (vp?.idr) {
+            unitPriceIdr = parseNum(vp.idr)
+          }
+        } else if (Array.isArray(item.vendorPrices)) {
+          // Jika belum ada vendor yang dipilih, ambil vendor pertama yang memiliki harga
+          for (let i = 0; i < item.vendorPrices.length; i++) {
+            const vp = item.vendorPrices[i]
+            const usd = parseNum(vp?.usd)
+            if (usd > 0) {
+              unitPriceIdr = Math.round(usd * rate)
+              break
+            } else if (vp?.idr && parseNum(vp.idr) > 0) {
+              unitPriceIdr = parseNum(vp.idr)
+              break
+            }
+          }
+        }
+
+        const qty = item.qty ? String(item.qty) : ''
+        const unitPriceStr = unitPriceIdr > 0 ? String(unitPriceIdr) : ''
+        const amt = parseNum(qty) * parseNum(unitPriceStr)
+
+        return {
+          id: Date.now() + idx + Math.floor(Math.random() * 1000),
+          no: idx + 1,
+          pn: item.pn || '',
+          description: item.description || '',
+          note: '',
+          qty: qty,
+          unit: item.unit || 'PC',
+          unitPrice: unitPriceStr,
+          amount: amt,
+          toko: '',
+        }
+      })
+
+      setItems(newItems)
+    }
+
+    setSelectedRfsSearch(doc.projectName || '')
+    setRfsDialogOpen(false)
+    alert(`Data RFS "${doc.projectName || 'Tanpa Judul'}" berhasil ditarik! (${doc.items?.length || 0} item)`)
+  }
+
   useEffect(() => {
     getCustomers()
       .then(setCustomers)
@@ -523,6 +628,8 @@ export function ModalEstimasi({
   const resetAll = useCallback(() => {
     setFormInfo(defaultFormInfo)
     setItems([])
+    setSelectedRfsSearch('')
+    setRfsFilterQuery('')
     setCosts({
       ...defaultCosts,
       qtyBankCharge: '',
@@ -640,6 +747,51 @@ export function ModalEstimasi({
               <RefreshCw className='h-3.5 w-3.5' />
               Reset
             </Button>
+            {!quotationMode && (
+              <div className='flex items-center gap-1'>
+                <Input
+                  value={selectedRfsSearch}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setSelectedRfsSearch(val)
+                    const found = rfsHistory.find(
+                      (h) =>
+                        h.projectName &&
+                        h.projectName.toLowerCase() === val.trim().toLowerCase()
+                    )
+                    if (found) {
+                      handleApplyRfs(found)
+                    }
+                  }}
+                  onFocus={loadRfsHistory}
+                  list='modal-estimasi-rfs-numbers-index'
+                  placeholder='Search No. RFS...'
+                  aria-label='Search No. RFS'
+                  className='h-8 w-40 text-xs'
+                />
+                <datalist id='modal-estimasi-rfs-numbers-index'>
+                  {rfsHistory
+                    .filter((h) => h.projectName)
+                    .map((h) => (
+                      <option key={h.id} value={h.projectName}>
+                        {h.projectName} ({h.items?.length || 0} item)
+                      </option>
+                    ))}
+                </datalist>
+                <Button
+                  variant='outline'
+                  size='icon'
+                  className='h-8 w-8 shrink-0'
+                  title='Tarik Data RFS dari Vendor Analytic'
+                  onClick={() => {
+                    loadRfsHistory()
+                    setRfsDialogOpen(true)
+                  }}
+                >
+                  <SearchIcon className='h-3.5 w-3.5' />
+                </Button>
+              </div>
+            )}
             {!quotationMode && (
               <>
                 <div className='flex items-center gap-1'>
@@ -1904,6 +2056,102 @@ export function ModalEstimasi({
               Batal
             </Button>
             <Button onClick={handleSave}>Simpan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Tarik RFS dari Vendor Analytic */}
+      <Dialog open={rfsDialogOpen} onOpenChange={setRfsDialogOpen}>
+        <DialogContent className='max-h-[85vh] overflow-hidden flex flex-col sm:max-w-2xl'>
+          <DialogHeader>
+            <DialogTitle>Tarik Data RFS (Vendor Analytic)</DialogTitle>
+            <DialogDescription>
+              Pilih data RFS / Project yang telah disimpan di halaman Vendor Analytic untuk dimasukkan ke Modal Estimasi.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='my-2 flex items-center gap-2'>
+            <div className='relative flex-1'>
+              <SearchIcon className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
+              <Input
+                placeholder='Cari nomor RFS atau nama project...'
+                value={rfsFilterQuery}
+                onChange={(e) => setRfsFilterQuery(e.target.value)}
+                className='h-9 pl-9 text-sm'
+              />
+            </div>
+          </div>
+
+          <div className='flex-1 overflow-y-auto divide-y rounded-md border'>
+            {rfsHistory.filter((doc) => {
+              if (!rfsFilterQuery.trim()) return true
+              const q = rfsFilterQuery.toLowerCase()
+              return (
+                (doc.projectName && doc.projectName.toLowerCase().includes(q)) ||
+                (doc.vendors && doc.vendors.some((v: any) => v.name?.toLowerCase().includes(q)))
+              )
+            }).length === 0 ? (
+              <div className='py-8 text-center text-sm text-muted-foreground'>
+                {rfsHistory.length === 0
+                  ? 'Belum ada data yang tersimpan di Vendor Analytic.'
+                  : 'Tidak ada data RFS yang sesuai pencarian.'}
+              </div>
+            ) : (
+              rfsHistory
+                .filter((doc) => {
+                  if (!rfsFilterQuery.trim()) return true
+                  const q = rfsFilterQuery.toLowerCase()
+                  return (
+                    (doc.projectName && doc.projectName.toLowerCase().includes(q)) ||
+                    (doc.vendors && doc.vendors.some((v: any) => v.name?.toLowerCase().includes(q)))
+                  )
+                })
+                .map((doc) => (
+                  <div
+                    key={doc.id}
+                    className='flex items-center justify-between p-3 transition-colors hover:bg-muted/50'
+                  >
+                    <div className='space-y-1 min-w-0 pr-3'>
+                      <div className='font-semibold text-sm truncate'>
+                        {doc.projectName || 'Tanpa Nama RFS'}
+                      </div>
+                      <div className='flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
+                        <span>
+                          {new Date(doc.date).toLocaleDateString('id-ID', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span>{doc.items?.length || 0} Item</span>
+                        <span>•</span>
+                        <span>Kurs: Rp {Number(doc.usdRate || 17500).toLocaleString('id-ID')}</span>
+                      </div>
+                      {doc.vendors && doc.vendors.length > 0 && (
+                        <div className='text-[11px] text-muted-foreground truncate'>
+                          Vendor: {doc.vendors.map((v: any) => v.name).filter(Boolean).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size='sm'
+                      onClick={() => handleApplyRfs(doc)}
+                      className='shrink-0 gap-1.5'
+                    >
+                      Tarik Data
+                    </Button>
+                  </div>
+                ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setRfsDialogOpen(false)}>
+              Tutup
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

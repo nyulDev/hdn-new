@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -10,6 +10,7 @@ import customersRouter from './routes/customers';
 import estimasiRouter from './routes/estimasi';
 import invoiceRouter from './routes/invoice';
 import usersRouter from './routes/users';
+import lapBulananRouter from './routes/lap-bulanan';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -23,6 +24,7 @@ app.use('/api/customers', customersRouter);
 app.use('/api/estimasi', estimasiRouter);
 app.use('/api/invoice', invoiceRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/lap-bulanan', lapBulananRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

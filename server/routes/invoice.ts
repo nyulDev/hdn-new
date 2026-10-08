@@ -120,4 +120,25 @@ router.put('/:id', async (req, res) => {
   }
 })
 
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const deleted = await sql`
+      DELETE FROM invoice
+      WHERE id = ${id}
+      RETURNING *
+    `
+
+    if (deleted.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' })
+    }
+
+    res.json({ message: 'Invoice deleted successfully' })
+  } catch (error) {
+    console.error('Failed to delete invoice:', error)
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
 export default router

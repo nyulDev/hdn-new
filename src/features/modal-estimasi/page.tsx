@@ -1,11 +1,22 @@
 import {
   createContext,
   useContext,
+  useRef,
   useState,
   useCallback,
   useEffect,
 } from 'react'
-import { Plus, Trash2, Printer, RefreshCw, Save, FileText } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Printer,
+  RefreshCw,
+  Save,
+  FileText,
+  CalendarIcon,
+  Download,
+  Search as SearchIcon,
+} from 'lucide-react'
 import { getCustomers, type Customer } from '@/lib/api/customers'
 import {
   saveEstimasi,
@@ -32,6 +43,14 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { Calendar } from '@/components/ui/calendar'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas-pro'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -178,9 +197,9 @@ const defaultQuotationDetails = {
 const defaultCosts: CostConfig = {
   discountPct: '-2',
   qtyBankCharge: '1',
-  bankChargeUsd: '0',
+  bankChargeUsd: '18000',
   qtyPackingCost: '1',
-  packingCostUsd: '17.200',
+  packingCostUsd: '18000',
   dutyTaxPct: '25',
   qtyAirDhl: '',
   airDhlKgs: '0',
@@ -191,7 +210,7 @@ const defaultCosts: CostConfig = {
   qtySeaDoor: '',
   seaDoorCbm: '5500.000',
   qtyLocalCost: '',
-  localCostUsd: '17.200',
+  localCostUsd: '18000',
   qtyFeeKurir: '1',
   feeKurir: '100.000',
   qtyTruk: '1',
@@ -281,8 +300,185 @@ export function ModalEstimasi({
   const [customers, setCustomers] = useState<Customer[]>([])
 
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [inquiryDialogOpen, setInquiryDialogOpen] = useState(false)
+  const inquiryContentRef = useRef<HTMLDivElement>(null)
+
+  const handleDownloadInquiryPdf = async () => {
+    if (!inquiryContentRef.current) {
+      alert('Konten tidak ditemukan')
+      return
+    }
+
+    try {
+      const clone = inquiryContentRef.current.cloneNode(true) as HTMLElement
+      clone.style.cssText =
+        'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;'
+      document.body.appendChild(clone)
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+      })
+
+      document.body.removeChild(clone)
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98)
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 8
+      const contentWidth = pageWidth - margin * 2
+      const imgHeightMm = (canvas.height * contentWidth) / canvas.width
+      const pageContentHeight = pageHeight - margin * 2
+
+      if (imgHeightMm <= pageContentHeight) {
+        pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, imgHeightMm)
+      } else {
+        const pageHeightPx = Math.floor((pageContentHeight / contentWidth) * canvas.width)
+        let yPx = 0
+        while (yPx < canvas.height) {
+          if (yPx > 0) pdf.addPage()
+          const sliceCanvas = document.createElement('canvas')
+          sliceCanvas.width = canvas.width
+          sliceCanvas.height = Math.min(pageHeightPx, canvas.height - yPx)
+          const ctx = sliceCanvas.getContext('2d')!
+          ctx.drawImage(canvas, 0, yPx, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height)
+          const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98)
+          const sliceHeightMm = (sliceCanvas.height * contentWidth) / canvas.width
+          pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceHeightMm)
+          yPx += pageHeightPx
+        }
+      }
+
+      const filename = formInfo.noQuo
+        ? `Inquery-${formInfo.noQuo}.pdf`
+        : 'Inquery.pdf'
+      pdf.save(filename)
+    } catch (err) {
+      console.error('Download PDF error:', err)
+      alert(`Gagal membuat PDF: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [savedList, setSavedList] = useState<EstimasiList[]>([])
+
+  // ── RFS Vendor Analytic Search ──
+  const [rfsHistory, setRfsHistory] = useState<any[]>([])
+  const [rfsDialogOpen, setRfsDialogOpen] = useState(false)
+  const [selectedRfsSearch, setSelectedRfsSearch] = useState('')
+  const [rfsFilterQuery, setRfsFilterQuery] = useState('')
+
+  const loadRfsHistory = useCallback(() => {
+    try {
+      const raw = localStorage.getItem('vendorAnalyticHistory')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          setRfsHistory(parsed)
+          return parsed
+        }
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load vendorAnalyticHistory:', e)
+    }
+    setRfsHistory([])
+    return []
+  }, [])
+
+  useEffect(() => {
+    loadRfsHistory()
+  }, [loadRfsHistory])
+
+  const handleApplyRfs = (doc: any) => {
+    if (!doc) return
+
+    // 1. Set No. RFS di formInfo
+    setFormInfo((prev) => ({
+      ...prev,
+      noRfs: doc.projectName || prev.noRfs,
+    }))
+
+    // 2. Set Kurs USD jika ada
+    if (doc.usdRate) {
+      setCosts((prev) => ({
+        ...prev,
+        usdRate: String(doc.usdRate),
+      }))
+    }
+
+    // 3. Tarik items dari vendor analytic
+    if (Array.isArray(doc.items) && doc.items.length > 0) {
+      const rate = parseNum(doc.usdRate) || parseNum(costs.usdRate) || 17500
+      const newItems: LineItem[] = doc.items.map((item: any, idx: number) => {
+        const selIdx =
+          typeof item.selectedVendor === 'number' && item.selectedVendor >= 0
+            ? item.selectedVendor
+            : null
+
+        let unitPriceIdr = 0
+
+        if (selIdx !== null && item.vendorPrices?.[selIdx]) {
+          const vp = item.vendorPrices[selIdx]
+          const usd = parseNum(vp?.usd)
+          if (usd > 0) {
+            unitPriceIdr = Math.round(usd * rate)
+          } else if (vp?.idr) {
+            unitPriceIdr = parseNum(vp.idr)
+          }
+        } else if (Array.isArray(item.vendorPrices)) {
+          // Jika belum ada vendor yang dipilih, ambil vendor pertama yang memiliki harga
+          for (let i = 0; i < item.vendorPrices.length; i++) {
+            const vp = item.vendorPrices[i]
+            const usd = parseNum(vp?.usd)
+            if (usd > 0) {
+              unitPriceIdr = Math.round(usd * rate)
+              break
+            } else if (vp?.idr && parseNum(vp.idr) > 0) {
+              unitPriceIdr = parseNum(vp.idr)
+              break
+            }
+          }
+        }
+
+        const qty = item.qty ? String(item.qty) : ''
+        const unitPriceStr = unitPriceIdr > 0 ? String(unitPriceIdr) : ''
+        const amt = parseNum(qty) * parseNum(unitPriceStr)
+
+        return {
+          id: Date.now() + idx + Math.floor(Math.random() * 1000),
+          no: idx + 1,
+          pn: item.pn || '',
+          description: item.description || '',
+          note: '',
+          qty: qty,
+          qtyActual: '',
+          unit: item.unit || 'PC',
+          unitActual: item.unit || 'PC',
+          unitPrice: unitPriceStr,
+          amount: amt,
+          unitPriceActual: '',
+          discActual: '',
+          amountActual: 0,
+          toko: '',
+          unitPriceQuo: '',
+          amountQuo: 0,
+        }
+      })
+
+      setItems(newItems)
+    }
+
+    setSelectedRfsSearch(doc.projectName || '')
+    setRfsDialogOpen(false)
+    alert(`Data RFS "${doc.projectName || 'Tanpa Judul'}" berhasil ditarik! (${doc.items?.length || 0} item)`)
+  }
 
   useEffect(() => {
     getCustomers()
@@ -311,21 +507,23 @@ export function ModalEstimasi({
   const [loadingQuotation, setLoadingQuotation] = useState(false)
   // Nomor urut quotation (bagian pertama dari format No. Quo)
   const [noQuoNumber, setNoQuoNumber] = useState('')
+  const [deliveryCost, setDeliveryCost] = useState(false)
 
-  // Sync formInfo.noQuo setiap kali nomor urut, dept, atau revisi berubah
+  // Sync formInfo.noQuo setiap kali nomor urut, dept, revisi, atau deliveryCost berubah
   useEffect(() => {
     if (!quotationMode) {
       const dept = formInfo.dept.trim().toUpperCase()
       const year = new Date().getFullYear()
       const revisiSegment =
         formInfo.revisi && formInfo.revisi !== '0' ? `-R${formInfo.revisi}` : ''
+      const middleSegment = deliveryCost ? 'DC-PH' : 'PH'
       const assembled = noQuoNumber
-        ? `${noQuoNumber}${revisiSegment}-PH-${dept || 'HDN'}-${year}`
+        ? `${noQuoNumber}${revisiSegment}-${middleSegment}-${dept || 'HDN'}-${year}`
         : ''
       setFormInfo((prev) => ({ ...prev, noQuo: assembled }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noQuoNumber, formInfo.dept, formInfo.revisi, quotationMode])
+  }, [noQuoNumber, formInfo.dept, formInfo.revisi, quotationMode, deliveryCost])
   const [quotationRange, setQuotationRange] = useState('')
   const [estimasiPct, setEstimasiPct] = useState('')
   const [quotationDiscountPct, setQuotationDiscountPct] = useState('10')
@@ -654,6 +852,8 @@ export function ModalEstimasi({
     setEditingEstimasiId(null)
     setFormInfo(defaultFormInfo)
     setItems([])
+    setSelectedRfsSearch('')
+    setRfsFilterQuery('')
     setCosts({
       ...defaultCosts,
       qtyBankCharge: '',
@@ -730,9 +930,9 @@ export function ModalEstimasi({
   const airDhlIdr = parseNum(costs.qtyAirDhl) * parseNum(costs.airDhlKgs)
   const airDoorIdr = parseNum(costs.qtyAirDoor) * parseNum(costs.airDoorKgs)
   const seaResmiIdr = parseNum(costs.qtySeaResmi) * parseNum(costs.seaResmiCbm) // CBM rate sudah IDR
-  const seaDoorIdr = parseNum(costs.qtySeaDoor) * parseNum(costs.seaDoorCbm) // CBM rate sudah IDR
+  const seaDoorIdr = parseNum(costs.qtySeaDoor) * parseNum(costs.seaDoorCbm) // qty × unit price (keduanya editable)
   const localCostIdr =
-    parseNum(costs.qtyLocalCost) * parseNum(costs.localCostUsd) * usdRate // USD → IDR
+    parseNum(costs.qtyLocalCost) * parseNum(costs.localCostUsd) // rate sudah IDR
   const feeKurirIdr = parseNum(costs.qtyFeeKurir) * parseNum(costs.feeKurir) // Unit Price sudah IDR
   const otherCostsTotal = costs.otherCosts.reduce(
     (total, cost) => total + parseNum(cost.qty) * parseNum(cost.unitPrice),
@@ -763,13 +963,22 @@ export function ModalEstimasi({
     ? parseNum(quotationDiscountAmount)
     : calculatedQuotationDiscount
   const quotationAfterDiscount = quotationSubtotal - quotationDiscount
-  const quotationPpn =
-    quotationAfterDiscount * (parseNum(quotationPpnPct) / 100)
+  const quotationDpp = (11 / 12) * quotationAfterDiscount
+  const quotationPpn = quotationDpp * (parseNum(quotationPpnPct) / 100)
   const quotationTotal = quotationAfterDiscount + quotationPpn
   // Jika SKTD aktif → TOTAL (IDR) = Total after discount (tanpa PPN)
   const effectiveQuotationTotal = formInfo.sktd
     ? quotationAfterDiscount
     : quotationTotal
+
+  // Auto-reset discount ke 0% jika subtotal < 1.000.000
+  useEffect(() => {
+    if (quotationMode && quotationSubtotal > 0 && quotationSubtotal < 1_000_000) {
+      setQuotationDiscountPct('0')
+      setQuotationDiscountAmount('0')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotationSubtotal, quotationMode])
   const tableHeaders = [
     'No',
     'P/N',
@@ -817,6 +1026,51 @@ export function ModalEstimasi({
               <RefreshCw className='h-3.5 w-3.5' />
               Reset
             </Button>
+            {!quotationMode && !actualMode && (
+              <div className='flex items-center gap-1'>
+                <Input
+                  value={selectedRfsSearch}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setSelectedRfsSearch(val)
+                    const found = rfsHistory.find(
+                      (h) =>
+                        h.projectName &&
+                        h.projectName.toLowerCase() === val.trim().toLowerCase()
+                    )
+                    if (found) {
+                      handleApplyRfs(found)
+                    }
+                  }}
+                  onFocus={loadRfsHistory}
+                  list='modal-estimasi-rfs-numbers'
+                  placeholder='Search No. RFS...'
+                  aria-label='Search No. RFS'
+                  className='h-8 w-40 text-xs'
+                />
+                <datalist id='modal-estimasi-rfs-numbers'>
+                  {rfsHistory
+                    .filter((h) => h.projectName)
+                    .map((h) => (
+                      <option key={h.id} value={h.projectName}>
+                        {h.projectName} ({h.items?.length || 0} item)
+                      </option>
+                    ))}
+                </datalist>
+                <Button
+                  variant='outline'
+                  size='icon'
+                  className='h-8 w-8 shrink-0'
+                  title='Tarik Data RFS dari Vendor Analytic'
+                  onClick={() => {
+                    loadRfsHistory()
+                    setRfsDialogOpen(true)
+                  }}
+                >
+                  <SearchIcon className='h-3.5 w-3.5' />
+                </Button>
+              </div>
+            )}
             {!quotationMode && (
               <>
                 <div className='flex items-center gap-1'>
@@ -889,6 +1143,17 @@ export function ModalEstimasi({
               <FileText className='h-3.5 w-3.5' />
               Report
             </Button>
+            {quotationMode && (
+              <Button
+                variant='outline'
+                size='sm'
+                className='gap-1.5'
+                onClick={() => setInquiryDialogOpen(true)}
+              >
+                <FileText className='h-3.5 w-3.5' />
+                Inquery
+              </Button>
+            )}
             <Button
               size='sm'
               className='gap-1.5'
@@ -912,63 +1177,113 @@ export function ModalEstimasi({
         {!actualMode && (
           <div className='mb-4 rounded-md border bg-background p-3 shadow-sm'>
             <div className='grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2 lg:grid-cols-3'>
-              {/* Row 1 */}
+              {/* Row 1 — Tanggal | Delivery Cost | PT | Kapal */}
               {!quotationMode && (
-                <div className='flex items-center gap-2'>
-                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    Tanggal
-                  </Label>
-                  <Input
-                    type='date'
-                    value={formInfo.tanggal}
-                    onChange={(e) => updateInfo('tanggal', e.target.value)}
-                    className='h-7 flex-1 text-xs'
-                  />
-                </div>
-              )}
-              {!quotationMode && (
-                <div className='flex items-center gap-2'>
-                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    PT
-                  </Label>
-                  <select
-                    value={formInfo.pt}
-                    onChange={(e) => handleCompanyChange(e.target.value)}
-                    className='h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs'
-                  >
-                    <option value=''>Pilih perusahaan</option>
-                    {customerCompanies.map((pt) => (
-                      <option key={pt} value={pt}>
-                        {pt}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {!quotationMode && (
-                <div className='flex items-center gap-2'>
-                  <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
-                    Kapal
-                  </Label>
-                  <select
-                    value={formInfo.kapal}
-                    onChange={(e) => updateInfo('kapal', e.target.value)}
-                    disabled={!formInfo.pt}
-                    className='h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-50'
-                  >
-                    <option value=''>Pilih kapal</option>
-                    {customerShips.map((customer) => (
-                      <option key={customer.id} value={customer.namaKapal}>
-                        {customer.namaKapal}
-                      </option>
-                    ))}
-                  </select>
+                <div className='col-span-full flex flex-wrap items-center gap-x-4 gap-y-2'>
+                  {/* Tanggal */}
+                  <div className='flex items-center gap-1.5'>
+                    <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                      Tanggal
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant='outline'
+                          className='h-7 w-34 justify-start gap-1.5 px-2 text-xs font-normal'
+                        >
+                          <CalendarIcon className='h-3 w-3 shrink-0 text-muted-foreground' />
+                          {formInfo.tanggal
+                            ? new Date(
+                                `${formInfo.tanggal}T00:00:00`
+                              ).toLocaleDateString('id-ID', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : 'Pilih tanggal'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className='w-auto p-0' align='start'>
+                        <Calendar
+                          mode='single'
+                          selected={
+                            formInfo.tanggal
+                              ? new Date(`${formInfo.tanggal}T00:00:00`)
+                              : undefined
+                          }
+                          onSelect={(date) => {
+                            if (date) {
+                              const iso = date.toLocaleDateString('sv-SE')
+                              updateInfo('tanggal', iso)
+                            }
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Delivery Cost */}
+                  <div className='flex items-center gap-1.5'>
+                    <Checkbox
+                      id='delivery-cost-check'
+                      checked={deliveryCost}
+                      onCheckedChange={(checked) =>
+                        setDeliveryCost(checked === true)
+                      }
+                    />
+                    <Label
+                      htmlFor='delivery-cost-check'
+                      className='cursor-pointer text-xs font-semibold text-muted-foreground'
+                    >
+                      Delivery Cost
+                    </Label>
+                  </div>
+
+                  {/* PT */}
+                  <div className='flex min-w-0 flex-1 items-center gap-1.5'>
+                    <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                      PT
+                    </Label>
+                    <select
+                      value={formInfo.pt}
+                      onChange={(e) => handleCompanyChange(e.target.value)}
+                      className='h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs'
+                    >
+                      <option value=''>Pilih perusahaan</option>
+                      {customerCompanies.map((pt) => (
+                        <option key={pt} value={pt}>
+                          {pt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Kapal */}
+                  <div className='flex min-w-0 flex-1 items-center gap-1.5'>
+                    <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                      Kapal
+                    </Label>
+                    <select
+                      value={formInfo.kapal}
+                      onChange={(e) => updateInfo('kapal', e.target.value)}
+                      disabled={!formInfo.pt}
+                      className='h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+                    >
+                      <option value=''>Pilih kapal</option>
+                      {customerShips.map((customer) => (
+                        <option key={customer.id} value={customer.namaKapal}>
+                          {customer.namaKapal}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
               {/* Row 2 */}
               {quotationMode && (
                 <div className='col-span-full'>
-                  {/* Satu baris: No. Quo | Range (%) | SKTD | Revisi */}
+                  {/* Satu baris: No. Quo | Unit Price Up (%) | SKTD | Revisi */}
                   <div className='flex flex-wrap items-center gap-x-6 gap-y-2'>
                     <div className='flex items-center gap-2'>
                       <Label className='w-16 shrink-0 text-xs font-semibold text-muted-foreground'>
@@ -1002,7 +1317,7 @@ export function ModalEstimasi({
 
                     <div className='flex items-center gap-2'>
                       <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
-                        Range (%)
+                        Unit Price Up (%)
                       </Label>
                       <Input
                         type='number'
@@ -1019,7 +1334,7 @@ export function ModalEstimasi({
 
                     <div className='flex items-center gap-2'>
                       <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
-                        Persentase Estimasi (%)
+                        Profit Estimasi (%)
                       </Label>
                       <Input
                         value={estimasiPct}
@@ -1055,8 +1370,9 @@ export function ModalEstimasi({
                             const year = new Date().getFullYear()
                             const revisiSegment =
                               value && value !== '0' ? `-R${value}` : ''
+                            const middleSegment = deliveryCost ? 'DC-PH' : 'PH'
                             if (baseNumber) {
-                              const newNoQuo = `${baseNumber}${revisiSegment}-PH-${dept}-${year}`
+                              const newNoQuo = `${baseNumber}${revisiSegment}-${middleSegment}-${dept}-${year}`
                               updateInfo('noQuo', newNoQuo)
                             }
                           }
@@ -1118,6 +1434,18 @@ export function ModalEstimasi({
                         </>
                       )}
                       <span className='text-xs text-muted-foreground'>-</span>
+                      {deliveryCost && (
+                        <>
+                          <Input
+                            value='DC'
+                            readOnly
+                            className='h-8 w-10 flex-none cursor-default border-dashed bg-blue-50 px-1 text-center text-xs text-blue-600 select-none focus-visible:ring-0'
+                          />
+                          <span className='text-xs text-muted-foreground'>
+                            -
+                          </span>
+                        </>
+                      )}
                       <Input
                         value='PH'
                         readOnly
@@ -1370,9 +1698,14 @@ export function ModalEstimasi({
                         <td className='border-r py-0.5 align-top'>
                           <Cell
                             value={item.discActual ?? ''}
-                            onChange={(v) =>
-                              updateItem(item.id, 'discActual', v)
-                            }
+                            onChange={(v) => {
+                              let newVal = v
+                              if (v && !v.includes('%')) {
+                                const digits = v.replace(/\D/g, '')
+                                newVal = digits ? Number(digits).toLocaleString('id-ID') : ''
+                              }
+                              updateItem(item.id, 'discActual', newVal)
+                            }}
                             placeholder='0 / 0%'
                             align='center'
                             className='w-full'
@@ -1526,7 +1859,7 @@ export function ModalEstimasi({
                             className='min-h-20 resize-y rounded-none border-dotted px-1 py-1 text-xs shadow-none focus-visible:ring-1'
                           />
                           <div className='my-3 border-t border-dotted' />
-                          <div className='grid grid-cols-[110px_12px_1fr] gap-y-1'>
+                          <div className='grid grid-cols-[130px_12px_1fr] gap-y-1'>
                             <span>a. Delivery</span>
                             <span>:</span>
                             <Input
@@ -1607,6 +1940,11 @@ export function ModalEstimasi({
                             label='Sub Total'
                             value={quotationSubtotal}
                           />
+                          {quotationSubtotal > 0 && quotationSubtotal < 1_000_000 && (
+                            <div className='rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-700'>
+                              ⚠ Tidak Mendapatkan Discount
+                            </div>
+                          )}
                           <QuotationSummaryRow
                             label={
                               <span className='flex items-center gap-1'>
@@ -1627,15 +1965,17 @@ export function ModalEstimasi({
                             }
                             value={
                               <Input
-                                type='number'
+                                type='text'
                                 min='0'
                                 value={
-                                  quotationDiscountAmount ||
-                                  String(Math.round(quotationDiscount))
+                                  quotationDiscountAmount
+                                    ? Number(quotationDiscountAmount).toLocaleString('id-ID')
+                                    : Math.round(quotationDiscount).toLocaleString('id-ID')
                                 }
-                                onChange={(event) =>
-                                  setQuotationDiscountAmount(event.target.value)
-                                }
+                                onChange={(event) => {
+                                  const raw = event.target.value.replace(/\./g, '').replace(/,/g, '')
+                                  setQuotationDiscountAmount(raw)
+                                }}
                                 aria-label='Discount amount'
                                 className='h-6 w-32 rounded-none border-dotted px-1 text-right text-xs font-normal shadow-none focus-visible:ring-1'
                               />
@@ -1644,6 +1984,10 @@ export function ModalEstimasi({
                           <QuotationSummaryRow
                             label='Total after discount'
                             value={quotationAfterDiscount}
+                          />
+                          <QuotationSummaryRow
+                            label='DPP'
+                            value={quotationDpp}
                           />
                           <QuotationSummaryRow
                             label={
@@ -1748,7 +2092,11 @@ export function ModalEstimasi({
                       <td className='border-r'>
                         <Cell
                           value={costs.bankChargeUsd}
-                          onChange={(v) => updateCost('bankChargeUsd', v)}
+                          onChange={(v) => {
+                            updateCost('bankChargeUsd', v)
+                            updateCost('packingCostUsd', v)
+                            updateCost('localCostUsd', v)
+                          }}
                           align='right'
                           highlight='yellow'
                           formatThousand
@@ -2255,6 +2603,7 @@ export function ModalEstimasi({
               quotationSubtotal={quotationSubtotal}
               quotationDiscount={quotationDiscount}
               quotationAfterDiscount={quotationAfterDiscount}
+              quotationDpp={quotationDpp}
               quotationPpn={quotationPpn}
               quotationTotal={effectiveQuotationTotal}
               quotationPpnPct={quotationPpnPct}
@@ -2294,6 +2643,139 @@ export function ModalEstimasi({
             <Button onClick={() => window.print()} className='gap-1.5'>
               <Printer className='h-3.5 w-3.5' />
               Print Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Inquery */}
+      <Dialog open={inquiryDialogOpen} onOpenChange={setInquiryDialogOpen}>
+        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-5xl'>
+          <DialogTitle className='sr-only'>Inquery</DialogTitle>
+          <div ref={inquiryContentRef}>
+            <QuotationReport
+              formInfo={formInfo}
+              items={items}
+              quotationRange={quotationRange}
+              quotationDetails={quotationDetails}
+              quotationSubtotal={quotationSubtotal}
+              quotationDiscount={quotationDiscount}
+              quotationAfterDiscount={quotationAfterDiscount}
+              quotationDpp={quotationDpp}
+              quotationPpn={quotationPpn}
+              quotationTotal={effectiveQuotationTotal}
+              quotationPpnPct={quotationPpnPct}
+              quotationDiscountPct={quotationDiscountPct}
+              customers={customers}
+              inquiryMode
+            />
+          </div>
+          <DialogFooter className='print:hidden'>
+            <Button
+              variant='outline'
+              onClick={() => setInquiryDialogOpen(false)}
+            >
+              Tutup
+            </Button>
+            <Button onClick={() => void handleDownloadInquiryPdf()} className='gap-1.5'>
+              <Download className='h-3.5 w-3.5' />
+              Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Tarik RFS dari Vendor Analytic */}
+      <Dialog open={rfsDialogOpen} onOpenChange={setRfsDialogOpen}>
+        <DialogContent className='max-h-[85vh] overflow-hidden flex flex-col sm:max-w-2xl'>
+          <DialogHeader>
+            <DialogTitle>Tarik Data RFS (Vendor Analytic)</DialogTitle>
+            <DialogDescription>
+              Pilih data RFS / Project yang telah disimpan di halaman Vendor Analytic untuk dimasukkan ke Modal Estimasi.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='my-2 flex items-center gap-2'>
+            <div className='relative flex-1'>
+              <SearchIcon className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
+              <Input
+                placeholder='Cari nomor RFS atau nama project...'
+                value={rfsFilterQuery}
+                onChange={(e) => setRfsFilterQuery(e.target.value)}
+                className='h-9 pl-9 text-sm'
+              />
+            </div>
+          </div>
+
+          <div className='flex-1 overflow-y-auto divide-y rounded-md border'>
+            {rfsHistory.filter((doc) => {
+              if (!rfsFilterQuery.trim()) return true
+              const q = rfsFilterQuery.toLowerCase()
+              return (
+                (doc.projectName && doc.projectName.toLowerCase().includes(q)) ||
+                (doc.vendors && doc.vendors.some((v: any) => v.name?.toLowerCase().includes(q)))
+              )
+            }).length === 0 ? (
+              <div className='py-8 text-center text-sm text-muted-foreground'>
+                {rfsHistory.length === 0
+                  ? 'Belum ada data yang tersimpan di Vendor Analytic.'
+                  : 'Tidak ada data RFS yang sesuai pencarian.'}
+              </div>
+            ) : (
+              rfsHistory
+                .filter((doc) => {
+                  if (!rfsFilterQuery.trim()) return true
+                  const q = rfsFilterQuery.toLowerCase()
+                  return (
+                    (doc.projectName && doc.projectName.toLowerCase().includes(q)) ||
+                    (doc.vendors && doc.vendors.some((v: any) => v.name?.toLowerCase().includes(q)))
+                  )
+                })
+                .map((doc) => (
+                  <div
+                    key={doc.id}
+                    className='flex items-center justify-between p-3 transition-colors hover:bg-muted/50'
+                  >
+                    <div className='space-y-1 min-w-0 pr-3'>
+                      <div className='font-semibold text-sm truncate'>
+                        {doc.projectName || 'Tanpa Nama RFS'}
+                      </div>
+                      <div className='flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
+                        <span>
+                          {new Date(doc.date).toLocaleDateString('id-ID', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span>{doc.items?.length || 0} Item</span>
+                        <span>•</span>
+                        <span>Kurs: Rp {Number(doc.usdRate || 17500).toLocaleString('id-ID')}</span>
+                      </div>
+                      {doc.vendors && doc.vendors.length > 0 && (
+                        <div className='text-[11px] text-muted-foreground truncate'>
+                          Vendor: {doc.vendors.map((v: any) => v.name).filter(Boolean).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size='sm'
+                      onClick={() => handleApplyRfs(doc)}
+                      className='shrink-0 gap-1.5'
+                    >
+                      Tarik Data
+                    </Button>
+                  </div>
+                ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setRfsDialogOpen(false)}>
+              Tutup
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2504,11 +2986,13 @@ function QuotationReport({
   quotationSubtotal,
   quotationDiscount,
   quotationAfterDiscount,
+  quotationDpp,
   quotationPpn,
   quotationTotal,
   quotationPpnPct,
   quotationDiscountPct,
   customers,
+  inquiryMode = false,
 }: {
   formInfo: FormInfo
   items: LineItem[]
@@ -2517,11 +3001,13 @@ function QuotationReport({
   quotationSubtotal: number
   quotationDiscount: number
   quotationAfterDiscount: number
+  quotationDpp: number
   quotationPpn: number
   quotationTotal: number
   quotationPpnPct: string
   quotationDiscountPct: string
   customers: Customer[]
+  inquiryMode?: boolean
 }) {
   const reportDate = formInfo.tanggal
     ? new Date(`${formInfo.tanggal}T00:00:00`).toLocaleDateString('id-ID', {
@@ -2541,10 +3027,7 @@ function QuotationReport({
       <div className='flex items-start justify-between border-b pb-3'>
         <div>
           <div className='text-2xl font-bold text-sky-700'>
-            HALUAN <span className='text-green-600'>DAYA NIAGA</span>, PT.
-          </div>
-          <div className='text-xs font-medium text-green-600'>
-            Marine - Oil & Gas - Mining Services
+            <span className='text-3xl text-green-600'>H</span>ALUAN <span className='text-3xl text-green-600'>D</span>AYA <span className='text-3xl text-green-600'>N</span>IAGA, PT.
           </div>
           <div className='mt-1 text-[10px] tracking-[0.25em] text-slate-500'>
             NPWP: 07.312.145.3-502.000
@@ -2560,14 +3043,14 @@ function QuotationReport({
         <div>
           <div>Ged. One Pacific Place, Level 11-SCBD</div>
           <div>Jl. Jend. Sudirman Kav. 52-53, Jakarta 12190</div>
-          <div>Ph./Fax. 021-22757897-7538093</div>
+          <div>WhatsApp : +62 811-821-723</div>
           <div>Email: sales@haluan.id / haluan.group@yahoo.co.id</div>
           <div>Website: www.haluan.id</div>
         </div>
         <div className='text-right'>
           <div className='font-bold'>Workshop:</div>
           <div>Cinere Residence H1 No. 5</div>
-          <div>Depok Meruyung Jawa Barat 16515</div>
+          <div>Depok Limo, Jawa Barat 16515</div>
         </div>
       </div>
       <div className='py-2 text-center'>
@@ -2575,28 +3058,52 @@ function QuotationReport({
           QUOTATION
         </div>
       </div>
-      <div className='grid grid-cols-2 gap-5 text-xs sm:grid-cols-[1fr_320px]'>
-        <div>
-          <div className='font-bold'>{formInfo.pt || '-'}</div>
-          <div>{formInfo.noRfs || formInfo.noQuo || '-'}</div>
-          <div>{formInfo.kapal || '-'}</div>
-          <div>Attn: {customer?.kontak || '-'}</div>
+      {inquiryMode ? (
+        <div className='flex items-start justify-between text-xs'>
+          <div>
+            <span className='font-bold'>NO</span>
+            <span className='ml-2'>{formInfo.noQuo || '-'}</span>
+          </div>
+          <div>
+            <span className='font-bold'>DATE</span>
+            <span className='ml-2'>{reportDate}</span>
+          </div>
         </div>
+      ) : (
+      <div className='grid grid-cols-2 gap-5 text-xs sm:grid-cols-[1fr_320px]'>
+        {!inquiryMode && (
+          <div>
+            <div className='font-bold'>{formInfo.pt || '-'}</div>
+            <div>{formInfo.noRfs || formInfo.noQuo || '-'}</div>
+            <div>{formInfo.kapal || '-'}</div>
+            <div>Attn: {customer?.kontak || '-'}</div>
+          </div>
+        )}
+        {inquiryMode && <div />}
         <div className='grid grid-cols-[115px_1fr] gap-y-1'>
           <span className='font-bold'>NO</span>
           <span>: {formInfo.noQuo || '-'}</span>
-          <span className='font-bold'>CUSTOMER ID</span>
-          <span>: {formInfo.pt || '-'}</span>
+          {!inquiryMode && (
+            <>
+              <span className='font-bold'>CUSTOMER ID</span>
+              <span>: {formInfo.pt || '-'}</span>
+            </>
+          )}
           <span className='font-bold'>DATE</span>
           <span>: {reportDate}</span>
-          <span className='font-bold'>PAGE</span>
-          <span>: 1</span>
-          <span className='font-bold'>SUBJECT</span>
-          <span>: {formInfo.subject || '-'}</span>
-          <span className='font-bold'>SUPPLY LOCATION</span>
-          <span>: {formInfo.supplyLocation || '-'}</span>
+          {!inquiryMode && (
+            <>
+              <span className='font-bold'>PAGE</span>
+              <span>: 1</span>
+              <span className='font-bold'>SUBJECT</span>
+              <span>: {formInfo.subject || '-'}</span>
+              <span className='font-bold'>SUPPLY LOCATION</span>
+              <span>: {formInfo.supplyLocation || '-'}</span>
+            </>
+          )}
         </div>
       </div>
+      )}
       <table className='w-full border-collapse text-xs'>
         <thead>
           <tr className='border-y border-slate-400 bg-slate-100'>
@@ -2605,8 +3112,7 @@ function QuotationReport({
               'CODE',
               'Description',
               'Quantity',
-              'Unit Price',
-              'Amount',
+              ...(!inquiryMode ? ['Unit Price', 'Amount'] : ['Unit Price', 'Amount']),
             ].map((header) => (
               <th
                 key={header}
@@ -2637,17 +3143,28 @@ function QuotationReport({
                 <td className='px-1.5 py-1'>
                   {item.qty} {item.unit}
                 </td>
-                <td className='px-1.5 py-1 text-right'>
-                  {formatQuotationAmount(unitPrice)}
-                </td>
-                <td className='px-1.5 py-1 text-right'>
-                  {formatQuotationAmount(parseNum(item.qty) * unitPrice)}
-                </td>
+                {!inquiryMode && (
+                  <>
+                    <td className='px-1.5 py-1 text-right'>
+                      {formatQuotationAmount(unitPrice)}
+                    </td>
+                    <td className='px-1.5 py-1 text-right'>
+                      {formatQuotationAmount(parseNum(item.qty) * unitPrice)}
+                    </td>
+                  </>
+                )}
+                {inquiryMode && (
+                  <>
+                    <td className='px-1.5 py-1' />
+                    <td className='px-1.5 py-1' />
+                  </>
+                )}
               </tr>
             )
           })}
         </tbody>
       </table>
+      {!inquiryMode && (
       <div className='grid gap-5 text-xs md:grid-cols-2'>
         <div className='space-y-1 font-medium'>
           <div className='font-bold'># Note</div>
@@ -2664,48 +3181,54 @@ function QuotationReport({
             value={quotationDetails.priceValidity}
           />
         </div>
-        <div className='self-start'>
-          <ReportRow label='Sub Total' value={quotationSubtotal} />
-          <ReportRow label={`Discount (${quotationDiscountPct}%)`} value={-quotationDiscount} />
-          <ReportRow
-            label='Total after discount'
-            value={quotationAfterDiscount}
-          />
-          <ReportRow label={`PPN ${quotationPpnPct}%`} value={quotationPpn} />
-          <div className='mt-1 bg-slate-100 p-2 text-sm font-bold'>
+        {!inquiryMode && (
+          <div className='self-start'>
+            <ReportRow label={`Discount (${quotationDiscountPct}%)`} value={-quotationDiscount} />
             <ReportRow
-              label='TOTAL QUOTATION MUST BE PAID (IDR)'
-              value={quotationTotal}
+              label='Total after discount'
+              value={quotationAfterDiscount}
             />
-          </div>
-        </div>
-      </div>
-      <div className='flex items-end justify-between border-t pt-4'>
-        <div>
-          <div className='mb-2 text-xs font-bold'>ASSOCIATION MEMBER:</div>
-          <div className='flex items-center gap-3'>
-            {['4.png', '5.png', '6.png'].map((image) => (
-              <img
-                key={image}
-                src={`/images/${image}`}
-                alt='Association member'
-                className='h-14 w-auto object-contain'
+            <ReportRow label='DPP' value={quotationDpp} />
+            <ReportRow label={`PPN ${quotationPpnPct}%`} value={quotationPpn} />
+            <div className='mt-1 bg-slate-100 p-2 text-sm font-bold'>
+              <ReportRow
+                label='TOTAL QUOTATION MUST BE PAID (IDR)'
+                value={quotationTotal}
               />
-            ))}
+            </div>
+          </div>
+        )}
+      </div>
+      )}
+      {!inquiryMode && (
+        <div className='flex items-end justify-between border-t pt-4'>
+          <div>
+            <div className='mb-2 text-xs font-bold'>ASSOCIATION MEMBER:</div>
+            <div className='flex items-center gap-3'>
+              {['4.png', '5.png', '6.png'].map((image) => (
+                <img
+                  key={image}
+                  src={`/images/${image}`}
+                  alt='Association member'
+                  className='h-14 w-auto object-contain'
+                />
+              ))}
+            </div>
+          </div>
+          <div className='text-right text-sm font-bold'>
+            PT. HALUAN DAYA NIAGA<div className='mt-10 font-normal'>IRFAN</div>
           </div>
         </div>
-        <div className='text-right text-sm font-bold'>
-          PT. HALUAN DAYA NIAGA<div className='mt-10 font-normal'>IRFAN</div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
 
 function ReportTextRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className='flex gap-2'>
-      <span className='shrink-0 font-bold'>{label} :</span>
+    <div className='grid grid-cols-[120px_12px_1fr] items-baseline gap-x-1'>
+      <span className='shrink-0 font-bold'>{label}</span>
+      <span className='font-bold'>:</span>
       <span>{value}</span>
     </div>
   )

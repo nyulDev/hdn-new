@@ -30,7 +30,9 @@ import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authen
 import { Route as AuthenticatedQuotationRouteRouteImport } from './routes/_authenticated/quotation/route'
 import { Route as AuthenticatedProfitRouteRouteImport } from './routes/_authenticated/profit/route'
 import { Route as AuthenticatedPenjualanRouteRouteImport } from './routes/_authenticated/penjualan/route'
+import { Route as AuthenticatedLapBulananRouteRouteImport } from './routes/_authenticated/lap-bulanan/route'
 import { Route as AuthenticatedInvoiceRouteRouteImport } from './routes/_authenticated/invoice/route'
+import { Route as AuthenticatedVendorAnalyticIndexRouteImport } from './routes/_authenticated/vendor-analytic/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
@@ -156,10 +158,22 @@ const AuthenticatedPenjualanRouteRoute =
     path: '/penjualan',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedLapBulananRouteRoute =
+  AuthenticatedLapBulananRouteRouteImport.update({
+    id: '/lap-bulanan',
+    path: '/lap-bulanan',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInvoiceRouteRoute =
   AuthenticatedInvoiceRouteRouteImport.update({
     id: '/invoice',
     path: '/invoice',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVendorAnalyticIndexRoute =
+  AuthenticatedVendorAnalyticIndexRouteImport.update({
+    id: '/vendor-analytic/',
+    path: '/vendor-analytic/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
@@ -263,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/invoice': typeof AuthenticatedInvoiceRouteRoute
+  '/lap-bulanan': typeof AuthenticatedLapBulananRouteRoute
   '/penjualan': typeof AuthenticatedPenjualanRouteRoute
   '/profit': typeof AuthenticatedProfitRouteRoute
   '/quotation': typeof AuthenticatedQuotationRouteRoute
@@ -296,10 +311,12 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
+  '/vendor-analytic/': typeof AuthenticatedVendorAnalyticIndexRoute
 }
 export interface FileRoutesByTo {
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/invoice': typeof AuthenticatedInvoiceRouteRoute
+  '/lap-bulanan': typeof AuthenticatedLapBulananRouteRoute
   '/penjualan': typeof AuthenticatedPenjualanRouteRoute
   '/profit': typeof AuthenticatedProfitRouteRoute
   '/quotation': typeof AuthenticatedQuotationRouteRoute
@@ -333,12 +350,14 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/vendor-analytic': typeof AuthenticatedVendorAnalyticIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/clerk': typeof ClerkRouteRouteWithChildren
   '/_authenticated/invoice': typeof AuthenticatedInvoiceRouteRoute
+  '/_authenticated/lap-bulanan': typeof AuthenticatedLapBulananRouteRoute
   '/_authenticated/penjualan': typeof AuthenticatedPenjualanRouteRoute
   '/_authenticated/profit': typeof AuthenticatedProfitRouteRoute
   '/_authenticated/quotation': typeof AuthenticatedQuotationRouteRoute
@@ -375,6 +394,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
+  '/_authenticated/vendor-analytic/': typeof AuthenticatedVendorAnalyticIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -382,6 +402,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clerk'
     | '/invoice'
+    | '/lap-bulanan'
     | '/penjualan'
     | '/profit'
     | '/quotation'
@@ -415,10 +436,12 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/tasks/'
     | '/users/'
+    | '/vendor-analytic/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/clerk'
     | '/invoice'
+    | '/lap-bulanan'
     | '/penjualan'
     | '/profit'
     | '/quotation'
@@ -452,11 +475,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/users'
+    | '/vendor-analytic'
   id:
     | '__root__'
     | '/_authenticated'
     | '/clerk'
     | '/_authenticated/invoice'
+    | '/_authenticated/lap-bulanan'
     | '/_authenticated/penjualan'
     | '/_authenticated/profit'
     | '/_authenticated/quotation'
@@ -493,6 +518,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
     | '/_authenticated/users/'
+    | '/_authenticated/vendor-analytic/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -659,11 +685,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPenjualanRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/lap-bulanan': {
+      id: '/_authenticated/lap-bulanan'
+      path: '/lap-bulanan'
+      fullPath: '/lap-bulanan'
+      preLoaderRoute: typeof AuthenticatedLapBulananRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/invoice': {
       id: '/_authenticated/invoice'
       path: '/invoice'
       fullPath: '/invoice'
       preLoaderRoute: typeof AuthenticatedInvoiceRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vendor-analytic/': {
+      id: '/_authenticated/vendor-analytic/'
+      path: '/vendor-analytic'
+      fullPath: '/vendor-analytic/'
+      preLoaderRoute: typeof AuthenticatedVendorAnalyticIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/users/': {
@@ -813,6 +853,7 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedInvoiceRouteRoute: typeof AuthenticatedInvoiceRouteRoute
+  AuthenticatedLapBulananRouteRoute: typeof AuthenticatedLapBulananRouteRoute
   AuthenticatedPenjualanRouteRoute: typeof AuthenticatedPenjualanRouteRoute
   AuthenticatedProfitRouteRoute: typeof AuthenticatedProfitRouteRoute
   AuthenticatedQuotationRouteRoute: typeof AuthenticatedQuotationRouteRoute
@@ -829,10 +870,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedModalEstimasiIndexRoute: typeof AuthenticatedModalEstimasiIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
+  AuthenticatedVendorAnalyticIndexRoute: typeof AuthenticatedVendorAnalyticIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInvoiceRouteRoute: AuthenticatedInvoiceRouteRoute,
+  AuthenticatedLapBulananRouteRoute: AuthenticatedLapBulananRouteRoute,
   AuthenticatedPenjualanRouteRoute: AuthenticatedPenjualanRouteRoute,
   AuthenticatedProfitRouteRoute: AuthenticatedProfitRouteRoute,
   AuthenticatedQuotationRouteRoute: AuthenticatedQuotationRouteRoute,
@@ -849,6 +892,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedModalEstimasiIndexRoute: AuthenticatedModalEstimasiIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
+  AuthenticatedVendorAnalyticIndexRoute: AuthenticatedVendorAnalyticIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

@@ -1,5 +1,6 @@
 import {
   Building2,
+  BarChart3,
   Calculator,
   LayoutDashboard,
   FileText,
@@ -11,6 +12,8 @@ import {
   AudioWaveform,
   Command,
   GalleryVerticalEnd,
+  ShoppingCart,
+  CalendarDays,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -50,6 +53,11 @@ export const sidebarData: SidebarData = {
           title: 'Customers',
           url: '/customers',
           icon: Building2,
+        },
+        {
+          title: 'Vendor Analytic',
+          url: '/vendor-analytic',
+          icon: BarChart3,
         },
         {
           title: 'Modal Estimasi',
@@ -131,6 +139,16 @@ export const sidebarData: SidebarData = {
           title: 'SOA Satuan',
           url: '/soa-satuan',
           icon: ClipboardClock,
+        },
+      ],
+    },
+    {
+      title: 'Purchasing',
+      items: [
+        {
+          title: 'Lap. Bulanan',
+          url: '/lap-bulanan',
+          icon: CalendarDays,
         },
       ],
     },

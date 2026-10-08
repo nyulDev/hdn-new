@@ -89,7 +89,8 @@ const toSalesRow = (
   const ppnPct = parseQuotationNumber(
     quotationData.formInfo?.quotationPpnPct ?? 12
   )
-  const ppn = totalAfterDiscount * (ppnPct / 100)
+  const dpp = (11 / 12) * totalAfterDiscount
+  const ppn = dpp * (ppnPct / 100)
   const modalRequested = getModalSubtotal(quotationData)
   const actualPurchase = getActualModalSubtotal(invoice)
   const grossProfit = totalAfterDiscount - actualPurchase
@@ -173,32 +174,70 @@ export function Penjualan() {
     void loadSalesData()
   }, [])
 
-  const rows = useMemo(
+  const rows = useMemo(() => {
+    // Deduplicate: keep only the latest invoice per invoiceNumber
+    const latestPerInvoiceNumber = new Map<string, InvoiceRecord>()
+    for (const invoice of invoices) {
+      if (
+        activeQuotationNumbers !== null &&
+        !activeQuotationNumbers.has(
+          String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
+        )
+      ) {
+        continue
+      }
+      const invoiceNum = getInvoiceNumber(invoice)
+      const existing = latestPerInvoiceNumber.get(invoiceNum)
+      if (!existing || invoice.id > existing.id) {
+        latestPerInvoiceNumber.set(invoiceNum, invoice)
+      }
+    }
+
+    return Array.from(latestPerInvoiceNumber.values())
+      .map((invoice, index) =>
+        toSalesRow(
+          invoice,
+          quotations[String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')],
+          customers,
+          index
+        )
+      )
+      .filter((row) => {
+        const query = search.trim().toLowerCase()
+        if (!query) return true
+        return `${row.customer} ${row.invoiceNumber} ${row.date}`
+          .toLowerCase()
+          .includes(query)
+      })
+  }, [activeQuotationNumbers, customers, invoices, quotations, search])
+
+  const totals = useMemo(
     () =>
-      invoices
-        .filter(
-          (invoice) =>
-            activeQuotationNumbers === null ||
-            activeQuotationNumbers.has(
-              String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
-            )
-        )
-        .map((invoice, index) =>
-          toSalesRow(
-            invoice,
-            quotations[String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')],
-            customers,
-            index
-          )
-        )
-        .filter((row) => {
-          const query = search.trim().toLowerCase()
-          if (!query) return true
-          return `${row.customer} ${row.invoiceNumber} ${row.date}`
-            .toLowerCase()
-            .includes(query)
+      rows.reduce(
+        (acc, row) => ({
+          totalAfterDiscount: acc.totalAfterDiscount + row.totalAfterDiscount,
+          ppn: acc.ppn + row.ppn,
+          modalRequested: acc.modalRequested + row.modalRequested,
+          actualPurchase: acc.actualPurchase + row.actualPurchase,
+          grossProfit: acc.grossProfit + row.grossProfit,
+          marketingFee: acc.marketingFee + row.marketingFee,
+          hsiShare: acc.hsiShare + row.hsiShare,
+          socialAid: acc.socialAid + row.socialAid,
+          netProfit: acc.netProfit + row.netProfit,
         }),
-    [activeQuotationNumbers, customers, invoices, quotations, search]
+        {
+          totalAfterDiscount: 0,
+          ppn: 0,
+          modalRequested: 0,
+          actualPurchase: 0,
+          grossProfit: 0,
+          marketingFee: 0,
+          hsiShare: 0,
+          socialAid: 0,
+          netProfit: 0,
+        }
+      ),
+    [rows]
   )
 
   return (
@@ -281,7 +320,7 @@ export function Penjualan() {
               ) : (
                 rows.map((row) => (
                   <tr
-                    key={row.invoiceNumber}
+                    key={`${row.invoiceNumber}-${row.id}`}
                     className='border-b last:border-0 hover:bg-muted/20'
                   >
                     <td className='px-2 py-4'>{row.id}</td>
@@ -325,6 +364,42 @@ export function Penjualan() {
                 ))
               )}
             </tbody>
+            {!loading && !error && rows.length > 0 && (
+              <tfoot>
+                <tr className='border-t-2 border-border bg-muted/40 font-bold text-foreground'>
+                  <td className='px-2 py-3' colSpan={4}>
+                    TOTAL ({rows.length} invoice)
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.totalAfterDiscount)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.ppn)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.modalRequested)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.actualPurchase)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.grossProfit)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.marketingFee)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.hsiShare)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap'>
+                    {formatCurrency(totals.socialAid)}
+                  </td>
+                  <td className='px-2 py-3 text-right whitespace-nowrap text-red-600'>
+                    {formatCurrency(totals.netProfit)}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </Main>

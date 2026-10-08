@@ -193,19 +193,56 @@ export function SoaSatuan() {
   }, [])
 
   const referenceDate = useMemo(() => new Date(), [])
-  const allRows = useMemo(
-    () =>
-      invoices
-        .filter(
-          (invoice) =>
-            activeQuotationNumbers !== null &&
-            activeQuotationNumbers.has(
-              String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
-            )
+  const allRows = useMemo(() => {
+    // Deduplicate: ambil hanya 1 invoice unik per No. Invoice
+    const latestPerInvoiceNumber = new Map<string, InvoiceRecord>()
+    for (const invoice of invoices) {
+      if (
+        activeQuotationNumbers !== null &&
+        !activeQuotationNumbers.has(
+          String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '')
         )
-        .map((invoice, index) => toAgingRow(invoice, index, referenceDate)),
-    [activeQuotationNumbers, invoices, referenceDate]
-  )
+      ) {
+        continue
+      }
+      const invoiceNum = getInvoiceNumber(invoice)
+      const existing = latestPerInvoiceNumber.get(invoiceNum)
+      if (!existing) {
+        latestPerInvoiceNumber.set(invoiceNum, invoice)
+      } else {
+        // Pertahankan status lunas dan detail pembayaran jika salah satu record sudah lunas
+        const isCurrentPaid = invoice.status === 'lunas'
+        const isExistingPaid = existing.status === 'lunas'
+        const base = invoice.id > existing.id ? { ...invoice } : { ...existing }
+
+        if (isExistingPaid || isCurrentPaid) {
+          const paidRecord = isCurrentPaid ? invoice : existing
+          base.status = 'lunas'
+          base.formInfo = {
+            ...base.formInfo,
+            paymentDate:
+              paidRecord.formInfo?.paymentDate ?? base.formInfo?.paymentDate,
+          }
+        }
+
+        if (
+          !base.formInfo?.noPo &&
+          (existing.formInfo?.noPo || invoice.formInfo?.noPo)
+        ) {
+          base.formInfo = {
+            ...base.formInfo,
+            noPo: existing.formInfo?.noPo || invoice.formInfo?.noPo,
+          }
+        }
+
+        latestPerInvoiceNumber.set(invoiceNum, base)
+      }
+    }
+
+    return Array.from(latestPerInvoiceNumber.values()).map((invoice, index) =>
+      toAgingRow(invoice, index, referenceDate)
+    )
+  }, [activeQuotationNumbers, invoices, referenceDate])
   const customers = useMemo(
     () => [...new Set(allRows.map((row) => row.customer))].sort(),
     [allRows]
@@ -358,31 +395,43 @@ export function SoaSatuan() {
                 <tr className='border-y border-red-500 text-center font-semibold'>
                   <th
                     rowSpan={2}
-                    className='w-[12%] border-r border-slate-300 p-1 text-[9px]'
+                    className='w-[9%] border-r border-slate-300 p-1 text-[9px]'
                   >
                     INV. DATE
                   </th>
                   <th
                     rowSpan={2}
-                    className='w-[17%] border-r border-slate-300 p-1'
+                    className='w-[14%] border-r border-slate-300 p-1'
                   >
                     INVOICE NO
                   </th>
                   <th
                     rowSpan={2}
-                    className='w-[9%] border-r border-slate-300 p-1'
+                    className='w-[12%] border-r border-slate-300 p-1'
+                  >
+                    PO NO
+                  </th>
+                  <th
+                    rowSpan={2}
+                    className='w-[12%] border-r border-slate-300 p-1'
+                  >
+                    NAMA KAPAL
+                  </th>
+                  <th
+                    rowSpan={2}
+                    className='w-[7%] border-r border-slate-300 p-1'
                   >
                     TERMS (DAYS)
                   </th>
                   <th
                     rowSpan={2}
-                    className='w-[17%] border-r border-slate-300 p-1'
+                    className='w-[10%] border-r border-slate-300 p-1'
                   >
                     DUE DATE
                   </th>
                   <th
                     rowSpan={2}
-                    className='w-[14%] border-r border-slate-300 p-1'
+                    className='w-[12%] border-r border-slate-300 p-1'
                   >
                     AMOUNT
                   </th>
@@ -394,7 +443,7 @@ export function SoaSatuan() {
                   </th>
                   <th
                     rowSpan={2}
-                    className='w-[14%] border-l border-slate-300 p-1'
+                    className='w-[10%] border-l border-slate-300 p-1'
                   >
                     PAYMENT DATE
                   </th>
@@ -419,6 +468,8 @@ export function SoaSatuan() {
                   >
                     <td className='p-1'>{formatDate(row.invoiceDate)}</td>
                     <td className='p-1'>{row.invoiceNumber}</td>
+                    <td className='p-1'>{row.poNumber}</td>
+                    <td className='p-1'>{row.vessel}</td>
                     <td className='p-1'>{row.terms}</td>
                     <td className='p-1'>{formatDate(row.dueDate)}</td>
                     <td className='p-1 text-right'>
@@ -437,7 +488,7 @@ export function SoaSatuan() {
                   </tr>
                 ))}
                 <tr className='font-bold'>
-                  <td colSpan={4} className='p-2 text-right'>
+                  <td colSpan={6} className='p-2 text-right'>
                     TOTAL
                   </td>
                   <td className='p-2 text-right'>

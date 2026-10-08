@@ -1,5 +1,13 @@
-import { useEffect, useState } from 'react'
-import { CheckCircle2, Printer, Save } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { CheckCircle2, Download, Printer, Save, CalendarIcon, RefreshCw } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas-pro'
+import { Calendar } from '@/components/ui/calendar'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { getEstimasiByNoQuo, getEstimasiList } from '@/lib/api/estimasi'
 import { getInvoiceByNoQuo } from '@/lib/api/invoice'
 import { Button } from '@/components/ui/button'
@@ -25,9 +33,11 @@ type TtbRow = {
   description: string
   code: string
   quotationQty: number
+  remainingQty: number
   qty: number
   unit: string
   note: string
+  itemNote: string
 }
 
 const parseQuantity = (value: unknown) => {
@@ -36,8 +46,8 @@ const parseQuantity = (value: unknown) => {
 }
 
 const formatDate = (value: unknown) => {
-  if (!value) return new Date().toLocaleDateString('id-ID')
-  const date = new Date(String(value))
+  if (!value) return new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+  const date = new Date(`${String(value)}T00:00:00`)
   return Number.isNaN(date.getTime())
     ? String(value)
     : date.toLocaleDateString('id-ID', {
@@ -60,6 +70,7 @@ export function TtbPage() {
   const [quotationList, setQuotationList] = useState<
     { id: number; noQuo: string }[]
   >([])
+  const ttbContentRef = useRef<HTMLDivElement>(null)
   const [quotation, setQuotation] = useState<TtbQuotation | null>(null)
   const [invoiceNoPo, setInvoiceNoPo] = useState('')
   const [invoiceNoRfs, setInvoiceNoRfs] = useState('')
@@ -172,12 +183,27 @@ export function TtbPage() {
         item.description ||
         `index-${index}`
     )
+  // Ambil qty TTB tersimpan sebelumnya untuk hitung sisa
+  const savedTtbQuantities: Record<string, number> = (() => {
+    try {
+      const noQuo = String(quotation?.formInfo?.noQuo ?? noQuoInput).trim()
+      const drafts = JSON.parse(
+        window.localStorage.getItem(ttbStorageKey) || '{}'
+      ) as Record<string, { quantities?: Record<string, number> }>
+      return drafts[noQuo]?.quantities ?? {}
+    } catch {
+      return {}
+    }
+  })()
+
   const ttbRows: TtbRow[] = items.map((item, index) => {
     const itemKey = getItemKey(item, index)
     const quotationQty = parseQuantity(item.qty)
+    const savedQty = savedTtbQuantities[itemKey] ?? 0
+    const remainingQty = Math.max(quotationQty - savedQty, 0)
     const qty = Math.min(
-      Math.max(selectedQuantities[itemKey] ?? quotationQty, 0),
-      quotationQty
+      Math.max(selectedQuantities[itemKey] ?? remainingQty, 0),
+      remainingQty
     )
 
     return {
@@ -186,9 +212,11 @@ export function TtbPage() {
       description: item.description || item.nama || item.name || '-',
       code: item.code || item.pn || '-',
       quotationQty,
+      remainingQty,
       qty,
       unit: item.unit || item.satuan || '',
-      note: notes[itemKey] ?? item.note ?? '',
+      note: notes[itemKey] ?? '',
+      itemNote: item.note || '',
     }
   })
 
@@ -213,7 +241,6 @@ export function TtbPage() {
   const handleSaveTtb = () => {
     const quotationNoQuo = String(formInfo.noQuo ?? noQuoInput).trim()
     if (!quotationNoQuo) return
-
     try {
       const drafts = JSON.parse(
         window.localStorage.getItem(ttbStorageKey) || '{}'
@@ -229,6 +256,83 @@ export function TtbPage() {
       alert('TTB berhasil disimpan.')
     } catch {
       alert('TTB tidak dapat disimpan di browser.')
+    }
+  }
+
+  const handleDownloadPdf = async () => {
+    if (!ttbContentRef.current) return
+    try {
+      const clone = ttbContentRef.current.cloneNode(true) as HTMLElement
+      clone.style.cssText =
+        'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;'
+
+      // Sembunyikan elemen bertanda data-pdf-hide
+      clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach((el) => {
+        el.style.display = 'none'
+      })
+      // Tampilkan elemen bertanda data-pdf-show
+      clone.querySelectorAll<HTMLElement>('[data-pdf-show]').forEach((el) => {
+        el.style.display = 'inline'
+      })
+      // Hapus border wrapper utama
+      clone.style.border = 'none'
+      clone.style.boxShadow = 'none'
+      // Hapus border semua input (termasuk catatan)
+      clone.querySelectorAll<HTMLElement>('input, textarea').forEach((el) => {
+        el.style.border = 'none'
+        el.style.outline = 'none'
+        el.style.boxShadow = 'none'
+        el.style.background = 'transparent'
+      })
+
+      document.body.appendChild(clone)
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+      })
+
+      document.body.removeChild(clone)
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98)
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 8
+      const contentWidth = pageWidth - margin * 2
+      const imgHeightMm = (canvas.height * contentWidth) / canvas.width
+      const pageContentHeight = pageHeight - margin * 2
+
+      if (imgHeightMm <= pageContentHeight) {
+        pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, imgHeightMm)
+      } else {
+        const pageHeightPx = Math.floor((pageContentHeight / contentWidth) * canvas.width)
+        let yPx = 0
+        while (yPx < canvas.height) {
+          if (yPx > 0) pdf.addPage()
+          const sliceCanvas = document.createElement('canvas')
+          sliceCanvas.width = canvas.width
+          sliceCanvas.height = Math.min(pageHeightPx, canvas.height - yPx)
+          const ctx = sliceCanvas.getContext('2d')!
+          ctx.drawImage(canvas, 0, yPx, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height)
+          const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98)
+          const sliceHeightMm = (sliceCanvas.height * contentWidth) / canvas.width
+          pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceHeightMm)
+          yPx += pageHeightPx
+        }
+      }
+
+      const noQuo = String(formInfo.noQuo ?? noQuoInput).trim()
+      pdf.save(noQuo ? `TTB-${noQuo}.pdf` : 'TTB.pdf')
+    } catch (err) {
+      console.error('Download PDF error:', err)
+      alert(`Gagal membuat PDF: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -275,66 +379,86 @@ export function TtbPage() {
                   <option key={item.id} value={item.noQuo} />
                 ))}
             </datalist>
+            <Button
+              variant='outline'
+              size='sm'
+              className='h-10 gap-1.5'
+              onClick={() => {
+                setNoQuoInput('')
+                setQuotation(null)
+                setSelectedQuantities({})
+                setNotes({})
+                setTtbDate('')
+                setLocation('')
+                setInvoiceNoPo('')
+                setInvoiceNoRfs('')
+              }}
+            >
+              <RefreshCw className='h-4 w-4' />
+              Reset
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {quotation ? (
-        <div className='mx-auto max-w-7xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:w-full print:max-w-none print:border-0 print:p-0 print:shadow-none'>
-          <div className='mb-4 flex justify-end gap-2 print:hidden'>
+        <div ref={ttbContentRef} className='mx-auto max-w-7xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:w-full print:max-w-none print:border-0 print:p-0 print:shadow-none'>
+          <div data-pdf-hide className='mb-4 flex justify-end gap-2 print:hidden'>
             <Button onClick={handleSaveTtb}>
               <Save className='h-4 w-4' />
               Simpan TTB
             </Button>
-            <Button variant='outline' onClick={() => window.print()}>
-              <Printer className='h-4 w-4' />
-              Print
+            <Button variant='outline' onClick={() => void handleDownloadPdf()}>
+              <Download className='h-4 w-4' />
+              Download PDF
             </Button>
           </div>
 
-          <div className='relative flex items-start justify-center border-b border-slate-200 pb-4'>
-            <div className='text-center'>
-              <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
-                <span className='text-[#21ae43]'>H</span>
-                <span className='text-[#004d91]'>ALUAN </span>
-                <span className='text-[#21ae43]'>D</span>
-                <span className='text-[#004d91]'>AYA </span>
-                <span className='text-[#21ae43]'>N</span>
-                <span className='text-[#004d91]'>IAGA, PT.</span>
-              </h1>
-              <p className='text-sm font-medium text-[#21ae43]'>
-                Marine - Oil & Gas - Mining Services
-              </p>
-              <p className='mt-1 text-xs text-slate-500'>
-                NPWP : 073.121.453.2-012.000
-              </p>
+          <div className='relative border-b border-slate-200 pb-4'>
+            {/* Baris atas: Nama perusahaan tengah + Logo kanan */}
+            <div className='flex items-start justify-between'>
+              <div className='w-24' />{/* spacer kiri agar nama tetap tengah */}
+              <div className='text-center'>
+                <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
+                  <span className='text-[#21ae43] text-4xl md:text-5xl'>H</span>
+                  <span className='text-[#004d91]'>ALUAN </span>
+                  <span className='text-[#21ae43] text-4xl md:text-5xl'>D</span>
+                  <span className='text-[#004d91]'>AYA </span>
+                  <span className='text-[#21ae43] text-4xl md:text-5xl'>N</span>
+                  <span className='text-[#004d91]'>IAGA, PT.</span>
+                </h1>
+                <p className='mt-1 text-xs text-slate-500'>
+                  NPWP : 073.121.453.2-012.000
+                </p>
+              </div>
+              <img
+                src='/images/logotok.png'
+                alt='Logo Haluan Daya Niaga'
+                className='h-16 w-16 object-contain'
+              />
             </div>
-            <img
-              src='/images/logotok.png'
-              alt='Logo Haluan Daya Niaga'
-              className='absolute top-0 right-0 h-24 w-24 object-contain'
-            />
-          </div>
-
-          <div className='grid gap-6 border-b border-slate-300 py-4 text-xs text-slate-600 md:grid-cols-[1fr_1fr_365px] print:grid-cols-[1fr_1fr_280px] print:gap-4 print:text-[10px]'>
-            <div>
-              <p className='font-semibold text-slate-900'>
-                Gd. One Pacific Place, Level 11-SCBD
-              </p>
-              <p>Jl. Jend. Sudirman Kav. 52-53, Jak-Sel 12190</p>
-              <p>Ph./Fax. 021-21275897-7538093</p>
-              <p>Email : sales@haluan.id / haluan.group@yahoo.co.id</p>
-              <p>Website : www.haluan-group.net</p>
+            {/* Baris bawah: Alamat kiri, Workshop kanan */}
+            <div className='mt-3 flex items-start justify-between text-xs text-slate-600'>
+              <div>
+                <p className='font-semibold text-slate-900'>
+                  Gd. One Pacific Place, Level 11-SCBD
+                </p>
+                <p>Jl. Jend. Sudirman Kav. 52-53, Jak-Sel 12190</p>
+                <p>WhatsApp : +62 811-821-723</p>
+                <p>Email : sales@haluan.id / haluan.group@yahoo.co.id</p>
+                <p>Website : www.haluan-group.net</p>
+              </div>
+              <div className='text-right'>
+                <p className='font-semibold text-slate-900'>Workshop:</p>
+                <p>Cinere Residence H1 No. 5</p>
+                <p>Depok Limo Jawa Barat 16515</p>
+              </div>
             </div>
-            <div className='justify-self-center text-center'>
-              <p className='font-semibold text-slate-900'>Workshop:</p>
-              <p>Cinere Residence H1 No. 5</p>
-              <p>Depok Regency Jawa Barat 16515</p>
-            </div>
-            <div className='self-center border-2 border-slate-700 px-2 py-1 text-center'>
-              <h2 className='text-2xl font-black tracking-[0.08em] text-red-600 uppercase md:text-3xl print:text-lg print:tracking-[0.04em]'>
+            {/* TANDA TERIMA BARANG */}
+            <div className='mt-3 px-2 py-1 text-center'>
+              <h1 className='text-xl font-black tracking-[0.06em] text-red-600 uppercase md:text-2xl print:text-lg print:tracking-[0.04em]'>
                 TANDA TERIMA BARANG
-              </h2>
+              </h1>
             </div>
           </div>
 
@@ -355,23 +479,38 @@ export function TtbPage() {
               <p className='pl-12'>{formInfo.kapal || '-'}</p>
               <p className='pl-12'>{noRfs}</p>
             </div>
-            <div className='grid grid-cols-2 border border-slate-700 text-center'>
-              <div className='border-r border-slate-700 p-2'>
+            <div className='grid grid-cols-[1fr_2fr] border border-slate-700 text-center'>
+              <div className='flex flex-col items-center justify-center border-r border-slate-700 p-2'>
                 <p className='font-bold'>Tanggal</p>
-                <Input
-                  type='date'
-                  value={ttbDate}
-                  onChange={(event) => setTtbDate(event.target.value)}
-                  className='mt-1 h-7 w-full border-0 p-0 text-center text-xs print:hidden'
-                  aria-label='Tanggal TTB'
-                />
-                <span className='hidden text-xs print:inline'>
-                  {formatDate(ttbDate)}
-                </span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      data-pdf-hide
+                      variant='ghost'
+                      className='mt-1 h-7 gap-1 px-2 text-xs font-normal print:hidden'
+                    >
+                      <CalendarIcon className='h-3 w-3 text-muted-foreground' />
+                      {ttbDate
+                        ? formatDate(ttbDate)
+                        : 'Pilih tanggal'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className='w-auto p-0' align='center'>
+                    <Calendar
+                      mode='single'
+                      selected={ttbDate ? new Date(`${ttbDate}T00:00:00`) : undefined}
+                      onSelect={(date) => {
+                        if (date) setTtbDate(date.toLocaleDateString('sv-SE'))
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span data-pdf-show className='mt-1 hidden text-sm print:inline'>{formatDate(ttbDate)}</span>
               </div>
-              <div className='p-2'>
+              <div className='flex flex-col items-center justify-center p-2'>
                 <p className='font-bold'>No.</p>
-                <p className='mt-2 text-xs'>{ttbNumber}</p>
+                <p className='mt-1 text-center text-xs'>{ttbNumber}</p>
               </div>
               <div className='col-span-2 border-t border-slate-700 p-2 text-left'>
                 <label className='font-semibold' htmlFor='ttb-no-po'>
@@ -379,6 +518,7 @@ export function TtbPage() {
                 </label>{' '}
                 <Input
                   id='ttb-no-po'
+                  data-pdf-hide
                   value={invoiceNoPo}
                   onChange={(event) => setInvoiceNoPo(event.target.value)}
                   placeholder='Ketik No. PO'
@@ -396,7 +536,7 @@ export function TtbPage() {
             <table className='w-full border-collapse text-left text-xs'>
               <thead className='bg-slate-100 text-slate-800'>
                 <tr>
-                  <th className='w-10 border border-slate-200 px-1 py-2 print:hidden'>
+                  <th data-pdf-hide className='w-10 border border-slate-200 px-1 py-2 print:hidden'>
                     Pilih
                   </th>
                   <th className='w-10 border border-slate-200 px-1 py-2'>No</th>
@@ -404,20 +544,20 @@ export function TtbPage() {
                   <th className='min-w-64 border border-slate-200 px-3 py-2'>
                     Uraian
                   </th>
-                  <th className='w-24 border border-slate-200 px-1 py-2 text-right'>
+                  <th className='w-24 border border-slate-200 px-1 py-2 text-center'>
                     Quantity
                   </th>
-                  <th className='w-20 border border-slate-200 px-1 py-2'>
+                  <th className='w-20 border border-slate-200 px-1 py-2 text-center'>
                     Satuan
                   </th>
-                  <th className='border border-slate-200 px-3 py-2'>Catatan</th>
+                  <th className='border border-slate-200 px-3 py-2 text-center'>Catatan</th>
                 </tr>
               </thead>
               <tbody>
                 {ttbRows.length > 0 ? (
                   ttbRows.map((row) => (
                     <tr key={row.id} className='align-top'>
-                      <td className='w-10 border border-slate-200 px-1 py-2 text-center print:hidden'>
+                      <td data-pdf-hide className='w-10 border border-slate-200 px-1 py-2 text-center print:hidden'>
                         <Checkbox
                           checked={row.qty > 0}
                           onCheckedChange={(checked) =>
@@ -429,17 +569,21 @@ export function TtbPage() {
                       <td className='w-10 border border-slate-200 px-1 py-2'>
                         {row.id}
                       </td>
-                      <td className='border border-slate-200 px-3 py-2'>
+                      <td className='border border-slate-200 px-3 py-2 whitespace-nowrap'>
                         {row.code}
                       </td>
                       <td className='min-w-64 border border-slate-200 px-3 py-2'>
-                        {row.description}
+                        <div>{row.description}</div>
+                        {row.itemNote && (
+                          <div className='mt-0.5 text-xs italic text-red-500'>{row.itemNote}</div>
+                        )}
                       </td>
-                      <td className='w-24 border border-slate-200 px-1 py-2 text-right'>
+                      <td className='w-24 border border-slate-200 px-1 py-2 text-center'>
                         <Input
+                          data-pdf-hide
                           type='number'
                           min={0}
-                          max={row.quotationQty}
+                          max={row.remainingQty}
                           step='any'
                           value={row.qty}
                           onChange={(event) =>
@@ -448,27 +592,31 @@ export function TtbPage() {
                               event.target.value
                             )
                           }
-                          className='ml-auto h-8 w-20 text-right'
+                          className='mx-auto h-8 w-20 text-center'
                           aria-label={`Qty ${row.description}`}
                         />
-                        <span className='mt-1 block text-xs text-slate-500 print:hidden'>
-                          Maks: {row.quotationQty}
+                        <span data-pdf-show className='hidden text-sm font-medium'>
+                          {row.qty}
+                        </span>
+                        <span data-pdf-hide className='mt-1 block text-xs text-slate-500 print:hidden'>
+                          Sisa: {row.remainingQty} / {row.quotationQty}
                         </span>
                       </td>
-                      <td className='w-20 border border-slate-200 px-1 py-2'>
+                      <td className='w-20 border border-slate-200 px-1 py-2 text-center'>
                         {row.unit || '-'}
                       </td>
-                      <td className='border border-slate-200 px-3 py-2'>
+                      <td className='border border-slate-200 px-3 py-2 text-center'>
                         <Input
+                          data-pdf-hide
                           value={row.note}
                           onChange={(event) =>
                             handleNoteChange(row.itemKey, event.target.value)
                           }
                           placeholder='Catatan'
-                          className='h-8 min-w-32 print:hidden'
+                          className='h-8 min-w-32 text-center print:hidden'
                           aria-label={`Notes ${row.description}`}
                         />
-                        <span className='hidden print:inline'>{row.note}</span>
+                        <span data-pdf-show className='hidden print:inline'>{row.note}</span>
                       </td>
                     </tr>
                   ))

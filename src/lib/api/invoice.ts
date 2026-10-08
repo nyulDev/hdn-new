@@ -53,3 +53,8 @@ export const updateInvoice = (
     method: 'PUT',
     body: JSON.stringify(data),
   })
+
+export const deleteInvoice = (id: number) =>
+  fetchApi<{ message: string }>(`/invoice/${id}`, {
+    method: 'DELETE',
+  })

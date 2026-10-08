@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react'
-import { Printer } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Printer, RefreshCw, Download, CalendarIcon } from 'lucide-react'
+import { Calendar } from '@/components/ui/calendar'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas-pro'
 import { getCustomers, type Customer } from '@/lib/api/customers'
 import { getEstimasiByNoQuo, getEstimasiList } from '@/lib/api/estimasi'
-import { createInvoice, getInvoices } from '@/lib/api/invoice'
+import { createInvoice, getInvoices, updateInvoice } from '@/lib/api/invoice'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -40,6 +48,26 @@ const getTodayInputDate = () => {
   return `${today.getFullYear()}-${month}-${day}`
 }
 
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des']
+const formatInvoiceDate = (dateStr: string) => {
+  if (!dateStr) return '-'
+  const d = new Date(`${dateStr}T00:00:00`)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = MONTH_NAMES[d.getMonth()]
+  const year = d.getFullYear()
+  return `${day} ${month} ${year}`
+}
+
+const calculateDueDate = (dateStr: string, daysToAdd = 30) => {
+  if (!dateStr) return '-'
+  const d = new Date(`${dateStr}T00:00:00`)
+  d.setDate(d.getDate() + daysToAdd)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = MONTH_NAMES[d.getMonth()]
+  const year = d.getFullYear()
+  return `${day} ${month} ${year}`
+}
+
 const getTtbNoPo = (noQuo: unknown) => {
   if (typeof window === 'undefined' || !String(noQuo ?? '').trim()) return ''
 
@@ -60,6 +88,7 @@ type InvoiceRow = {
   remainingQty: number
   pn: string
   description: string
+  note: string
   unit: string
   qty: number
   unitPrice: number
@@ -87,6 +116,84 @@ export function InvoicePage() {
     Record<string, number>
   >({})
   const [saving, setSaving] = useState(false)
+  const [paymentTerm, setPaymentTerm] = useState('')
+  const [pdfPageCount, setPdfPageCount] = useState(1)
+  const invoiceContentRef = useRef<HTMLDivElement>(null)
+
+  const handleDownloadPdf = async () => {
+    if (!invoiceContentRef.current) return
+    try {
+      const clone = invoiceContentRef.current.cloneNode(true) as HTMLElement
+      clone.style.cssText =
+        'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;border:none;outline:none;box-shadow:none;'
+      // Remove any yellow outline/border from all child elements
+      clone.querySelectorAll<HTMLElement>('*').forEach((el) => {
+        el.style.outline = 'none'
+        el.style.boxShadow = 'none'
+      })
+      clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach((el) => {
+        el.style.display = 'none'
+      })
+      // Show pdf-show spans (qty value, tanggal, location plain text)
+      clone.querySelectorAll<HTMLElement>('.pdf-show').forEach((el) => {
+        el.style.display = 'inline'
+        el.style.border = 'none'
+        el.style.outline = 'none'
+        el.style.boxShadow = 'none'
+        el.style.background = 'transparent'
+        el.style.padding = '0'
+      })
+      document.body.appendChild(clone)
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+      })
+      document.body.removeChild(clone)
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98)
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 8
+      const contentWidth = pageWidth - margin * 2
+      const imgHeightMm = (canvas.height * contentWidth) / canvas.width
+      // Calculate actual page count from canvas dimensions
+      const pageContentHeight = pageHeight - margin * 2
+      const totalPages = Math.max(1, Math.ceil(imgHeightMm / pageContentHeight))
+      void totalPages // page count calculated but displayed via estimatedPageCount
+
+      if (imgHeightMm <= pageContentHeight) {
+        pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, imgHeightMm)
+      } else {
+        const pageHeightPx = Math.floor((pageContentHeight / contentWidth) * canvas.width)
+        let yPx = 0
+        while (yPx < canvas.height) {
+          if (yPx > 0) pdf.addPage()
+          const sliceCanvas = document.createElement('canvas')
+          sliceCanvas.width = canvas.width
+          sliceCanvas.height = Math.min(pageHeightPx, canvas.height - yPx)
+          const ctx = sliceCanvas.getContext('2d')!
+          ctx.drawImage(canvas, 0, yPx, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height)
+          const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98)
+          const sliceHeightMm = (sliceCanvas.height * contentWidth) / canvas.width
+          pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceHeightMm)
+          yPx += pageHeightPx
+        }
+      }
+
+      const noQuo = String(loadedInvoice?.formInfo?.noQuo ?? loadedInvoice?.noQuo ?? '').trim()
+      pdf.save(noQuo ? `Invoice-${noQuo}.pdf` : 'Invoice.pdf')
+    } catch (err) {
+      console.error('Download PDF error:', err)
+      alert(`Gagal membuat PDF: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
   const [showOriginalQuotation, setShowOriginalQuotation] = useState(false)
   const [selectedSavedInvoiceId, setSelectedSavedInvoiceId] = useState<
     number | null
@@ -109,6 +216,47 @@ export function InvoicePage() {
       .then(setInvoices)
       .catch(() => setInvoices([]))
   }, [])
+
+  useEffect(() => {
+    if (!invoiceContentRef.current) return
+    let timeoutId: NodeJS.Timeout
+    const calculatePageCount = () => {
+      const el = invoiceContentRef.current
+      if (!el) return
+      
+      const clone = el.cloneNode(true) as HTMLElement
+      clone.style.cssText =
+        'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;border:none;outline:none;box-shadow:none;visibility:hidden;'
+      
+      clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach((node) => {
+        node.style.display = 'none'
+      })
+      clone.querySelectorAll<HTMLElement>('.pdf-show').forEach((node) => {
+        node.style.display = 'inline'
+        node.style.border = 'none'
+        node.style.outline = 'none'
+        node.style.boxShadow = 'none'
+        node.style.background = 'transparent'
+        node.style.padding = '0'
+      })
+
+      document.body.appendChild(clone)
+      
+      const contentWidthMm = 194
+      const contentHeightMm = 281
+      const scrollHeight = clone.scrollHeight
+      const scrollWidth = clone.scrollWidth || 794
+      const imgHeightMm = (scrollHeight * contentWidthMm) / scrollWidth
+      const pages = Math.max(1, Math.ceil(imgHeightMm / contentHeightMm))
+      
+      setPdfPageCount(pages)
+      document.body.removeChild(clone)
+    }
+
+    timeoutId = setTimeout(calculatePageCount, 300)
+    return () => clearTimeout(timeoutId)
+  }, [loadedInvoice, showOriginalQuotation, selectedQuantities, selectedSavedInvoiceId, location, invoiceDate, noPo])
+
 
   const activeQuotationNumbers = new Set(
     quotationList.map((quotation) => quotation.noQuo)
@@ -172,6 +320,7 @@ export function InvoicePage() {
         invoice.formInfo?.tanggal ||
         getTodayInputDate()
     )
+    setPaymentTerm(invoice.formInfo?.paymentTerm || '')
     setShowOriginalQuotation(false)
   }
 
@@ -229,6 +378,7 @@ export function InvoicePage() {
         remainingQty,
         pn: item?.pn || '-',
         description: item?.description || item?.nama || item?.name || 'Item',
+        note: item?.note || '',
         unit: item?.unit || item?.satuan || '-',
         qty,
         unitPrice,
@@ -271,14 +421,18 @@ export function InvoicePage() {
   const previewTotalAfterDiscount = previewSubtotal - previewDiscountAmount
   const previewDpp = (11 / 12) * previewTotalAfterDiscount
   const previewPpn = previewDpp * (ppnPct / 100)
-  const previewTotalInvoice = previewDpp + previewPpn
+  const previewTotalInvoice = previewTotalAfterDiscount + previewPpn
+  const estimatedPageCount = pdfPageCount
   const invoiceNo = loadedInvoice
     ? (() => {
         const noQuo = (loadedInvoice.formInfo?.noQuo || 'XXX').replace(
           /\s+/g,
           ''
         )
-        return noQuo.replace(/(-\d{4})$/, '-INV$1')
+        const baseInv = noQuo.replace(/(-\d{4})$/, '-INV$1')
+        return paymentTerm
+          ? noQuo.replace(/(-\d{4})$/, `-${paymentTerm.toUpperCase()}-INV$1`)
+          : baseInv
       })()
     : 'XXX-INV-2026'
   const customer = customers.find(
@@ -305,7 +459,7 @@ export function InvoicePage() {
     subtotal - invoicePreviewTotalAfterDiscount
   const invoicePreviewDpp = (11 / 12) * invoicePreviewTotalAfterDiscount
   const invoicePreviewPpn = invoicePreviewDpp * (ppnPct / 100)
-  const invoicePreviewTotal = invoicePreviewDpp + invoicePreviewPpn
+  const invoicePreviewTotal = invoicePreviewTotalAfterDiscount + invoicePreviewPpn
   const handleQuantityChange = (itemKey: string, value: string) => {
     const quantity = parseQuotationNumber(value)
     setSelectedQuantities((current) => ({ ...current, [itemKey]: quantity }))
@@ -327,16 +481,27 @@ export function InvoicePage() {
 
     setSaving(true)
     try {
-      await createInvoice({
-        noQuo: loadedInvoice.formInfo?.noQuo ?? noQuoInput,
+      const targetNoQuo = loadedInvoice.formInfo?.noQuo ?? noQuoInput
+      const existingInvoice = selectedSavedInvoiceId
+        ? invoices.find((inv) => inv.id === selectedSavedInvoiceId)
+        : invoices.find(
+            (inv) =>
+              (inv.formInfo?.noQuo ?? inv.noQuo) === targetNoQuo
+          )
+
+      const payload = {
+        noQuo: targetNoQuo,
         judul: loadedInvoice.judul ?? 'Invoice',
         customerName: loadedInvoice.formInfo?.pt ?? '',
         amount: totalInvoice,
-        status: 'belum_dibayar',
+        status: existingInvoice?.status ?? 'belum_dibayar',
         formInfo: {
           ...(loadedInvoice.formInfo ?? {}),
+          ...(existingInvoice?.formInfo ?? {}),
           noPo,
           invoiceDate,
+          paymentTerm,
+          invoiceNo: selectedSavedInvoiceId ? loadedInvoice?.formInfo?.invoiceNo || invoiceNo : invoiceNo,
           invoiceTotalAfterDiscount: totalAfterDiscount,
           quotationTotalAfterDiscount: previewTotalAfterDiscount,
           supplyLocation: location,
@@ -351,7 +516,13 @@ export function InvoicePage() {
             qty: row.qty,
           })),
         costs: loadedInvoice.costs ?? {},
-      })
+      }
+
+      if (existingInvoice) {
+        await updateInvoice(existingInvoice.id, payload)
+      } else {
+        await createInvoice(payload)
+      }
       const refreshedInvoices = await getInvoices()
       setInvoices(refreshedInvoices)
       setSelectedQuantities({})
@@ -425,41 +596,72 @@ export function InvoicePage() {
                 </option>
               ))}
             </select>
+            <Button
+              variant='outline'
+              size='sm'
+              className='h-10 gap-1.5'
+              onClick={() => {
+                setNoQuoInput('')
+                setLoadedInvoice(null)
+                setSelectedSavedInvoiceId(null)
+                setSelectedQuantities({})
+                setPaymentTerm('')
+              }}
+            >
+              <RefreshCw className='h-4 w-4' />
+              Reset
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {loadedInvoice ? (
-        <div className='rounded-xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:border-0 print:p-0 print:shadow-none'>
-          <div className='mb-4 flex justify-end gap-2 print:hidden'>
-            {selectedSavedInvoiceId === null && (
-              <Button
-                onClick={() => void handleSaveInvoice()}
-                disabled={saving}
-              >
-                {saving ? 'Menyimpan...' : 'Simpan Invoice'}
+        <div ref={invoiceContentRef} className='rounded-xl border border-slate-300 bg-white p-6 text-slate-900 shadow-sm print:border-0 print:p-0 print:shadow-none'>
+          <div className='mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden' data-pdf-hide>
+            <div className='flex items-center gap-4 text-sm font-medium'>
+               <span className='text-slate-700'>Term Pembayaran:</span>
+               <label className='flex items-center gap-1.5 cursor-pointer text-slate-700'>
+                 <input type='radio' name='paymentTerm' value='' checked={paymentTerm === ''} onChange={() => setPaymentTerm('')} className='accent-blue-600 cursor-pointer' /> Full
+               </label>
+               <label className='flex items-center gap-1.5 cursor-pointer text-slate-700'>
+                 <input type='radio' name='paymentTerm' value='1st' checked={paymentTerm === '1st'} onChange={() => setPaymentTerm('1st')} className='accent-blue-600 cursor-pointer' /> 1st
+               </label>
+               <label className='flex items-center gap-1.5 cursor-pointer text-slate-700'>
+                 <input type='radio' name='paymentTerm' value='2nd' checked={paymentTerm === '2nd'} onChange={() => setPaymentTerm('2nd')} className='accent-blue-600 cursor-pointer' /> 2nd
+               </label>
+               <label className='flex items-center gap-1.5 cursor-pointer text-slate-700'>
+                 <input type='radio' name='paymentTerm' value='3rd' checked={paymentTerm === '3rd'} onChange={() => setPaymentTerm('3rd')} className='accent-blue-600 cursor-pointer' /> 3rd
+               </label>
+            </div>
+            <div className='flex justify-end gap-2'>
+              {selectedSavedInvoiceId === null && (
+                <Button
+                  onClick={() => void handleSaveInvoice()}
+                  disabled={saving}
+                >
+                  {saving ? 'Menyimpan...' : 'Simpan Invoice'}
+                </Button>
+              )}
+              <Button variant='outline' onClick={() => void handleDownloadPdf()} className='gap-1.5'>
+                <Download className='h-4 w-4' />
+                Download PDF
               </Button>
-            )}
-            <Button variant='outline' onClick={() => window.print()}>
-              <Printer className='h-4 w-4' />
-              Print
-            </Button>
+              <Button variant='outline' onClick={() => window.print()}>
+                <Printer className='h-4 w-4' />
+                Print
+              </Button>
+            </div>
           </div>
           <div className='mb-6 flex items-start justify-between gap-4'>
             <div>
               <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
-                <span className='text-[#21ae43]'>H</span>
+                <span className='text-[#21ae43] text-4xl md:text-5xl'>H</span>
                 <span className='text-[#004d91]'>ALUAN </span>
-                <span className='text-[#21ae43]'>D</span>
+                <span className='text-[#21ae43] text-4xl md:text-5xl'>D</span>
                 <span className='text-[#004d91]'>AYA </span>
-                <span className='text-[#21ae43]'>N</span>
+                <span className='text-[#21ae43] text-4xl md:text-5xl'>N</span>
                 <span className='text-[#004d91]'>IAGA, PT.</span>
               </h1>
-              <p className='text-sm font-medium text-[#4b5563]'>
-                <span className='text-[#21ae43]'>
-                  Marine - Oil & Gas - Mining Services
-                </span>
-              </p>
               <p className='mt-1 font-mono text-xs text-[#6b7280]'>
                 N P W P : 0 7 3 . 1 2 1 . 4 5 3 . 2 - 0 1 2 . 0 0 0
               </p>
@@ -493,7 +695,7 @@ export function InvoicePage() {
               </p>
               <p> {loadedInvoice.formInfo?.kapal || '-'}</p>
               <p>Terms : 30 calendar days</p>
-              <p>Due Date : Fri 2 Oct 2026</p>
+              <p>Due Date : {calculateDueDate(invoiceDate)}</p>
             </div>
 
             <div className='space-y-2 text-sm print:absolute print:top-0 print:right-0 print:w-[260px]'>
@@ -501,44 +703,58 @@ export function InvoicePage() {
                 <span className='font-semibold'>NO</span>
                 <span>: {invoiceNo}</span>
                 <span className='font-semibold'>NO. PO</span>
-                <span>
+                <span className='flex items-center gap-1'>
                   :{' '}
                   <Input
                     value={noPo}
                     readOnly
                     placeholder='No. PO dari TTB'
                     className='inline-flex h-8 w-64 bg-muted print:hidden'
+                    data-pdf-hide
                     aria-label='No. PO'
                   />
-                  <span className='hidden print:inline'>{noPo || '-'}</span>
+                  <span className='hidden print:inline pdf-show'>{noPo || '-'}</span>
                 </span>
                 <span className='font-semibold'>CUSTOMER ID</span>
                 <span>: {customer?.id || '-'}</span>
                 <span className='font-semibold'>TANGGAL</span>
-                <span>
+                <span className='flex items-center gap-1'>
                   :{' '}
-                  <Input
-                    type='date'
-                    value={invoiceDate}
-                    onChange={(event) => setInvoiceDate(event.target.value)}
-                    className='inline-flex h-8 w-40 print:hidden'
-                    aria-label='Tanggal invoice'
-                  />
-                  <span className='hidden print:inline'>
-                    {invoiceDate
-                      ? new Date(`${invoiceDate}T00:00:00`).toLocaleDateString(
-                          'id-ID',
-                          {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='h-8 gap-1.5 px-2 text-sm font-normal print:hidden'
+                        data-pdf-hide
+                        aria-label='Pilih tanggal invoice'
+                      >
+                        <CalendarIcon className='h-3.5 w-3.5 text-muted-foreground' />
+                        {formatInvoiceDate(invoiceDate)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-auto p-0' align='start'>
+                      <Calendar
+                        mode='single'
+                        selected={invoiceDate ? new Date(`${invoiceDate}T00:00:00`) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const y = date.getFullYear()
+                            const m = String(date.getMonth() + 1).padStart(2, '0')
+                            const dd = String(date.getDate()).padStart(2, '0')
+                            setInvoiceDate(`${y}-${m}-${dd}`)
                           }
-                        )
-                      : '-'}
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <span className='hidden print:inline pdf-show'>
+                    {formatInvoiceDate(invoiceDate)}
                   </span>
                 </span>
                 <span className='font-semibold'>PAGE</span>
-                <span>: 1</span>
+                <span>: {estimatedPageCount}</span>
                 <span className='font-semibold'>LOCATION</span>
                 <span>
                   :{' '}
@@ -547,9 +763,10 @@ export function InvoicePage() {
                     onChange={(event) => setLocation(event.target.value)}
                     placeholder='Masukkan lokasi'
                     className='inline-flex h-8 w-40 print:hidden'
+                    data-pdf-hide
                     aria-label='Lokasi invoice'
                   />
-                  <span className='hidden print:inline'>{location || '-'}</span>
+                  <span className='hidden print:inline pdf-show'>{location || '-'}</span>
                 </span>
               </div>
             </div>
@@ -559,18 +776,18 @@ export function InvoicePage() {
             <table className='w-full border-collapse text-left text-sm'>
               <thead className='bg-slate-200 text-slate-800'>
                 <tr>
-                  <th className='w-12 border border-slate-300 px-1 py-2 print:hidden'>
+                  <th className='w-12 border border-slate-300 px-1 py-2 print:hidden' data-pdf-hide>
                     Pilih
                   </th>
                   <th className='w-10 border border-slate-300 px-1 py-2'>No</th>
-                  <th className='border border-slate-300 px-3 py-2'>Code</th>
+                  <th className='whitespace-nowrap border border-slate-300 px-3 py-2'>Code</th>
                   <th className='min-w-64 border border-slate-300 px-3 py-2'>
                     Description
                   </th>
-                  <th className='w-24 border border-slate-300 px-1 py-2 text-right'>
+                  <th className='w-24 border border-slate-300 px-1 py-2 text-center'>
                     Quantity
                   </th>
-                  <th className='w-20 border border-slate-300 px-1 py-2'>
+                  <th className='w-20 border border-slate-300 px-1 py-2 text-center'>
                     Satuan
                   </th>
                   <th className='border border-slate-300 px-3 py-2 text-right'>
@@ -588,7 +805,7 @@ export function InvoicePage() {
                       key={row.id}
                       className={`align-top ${row.qty === 0 ? 'print:hidden' : ''}`}
                     >
-                      <td className='w-12 border border-slate-300 px-1 py-2 text-center print:hidden'>
+                      <td className='w-12 border border-slate-300 px-1 py-2 text-center print:hidden' data-pdf-hide>
                         <Checkbox
                           checked={showOriginalQuotation || row.qty > 0}
                           disabled={
@@ -603,13 +820,16 @@ export function InvoicePage() {
                       <td className='w-10 border border-slate-300 px-1 py-2'>
                         {row.id}
                       </td>
-                      <td className='border border-slate-300 px-3 py-2'>
+                      <td className='whitespace-nowrap border border-slate-300 px-3 py-2'>
                         {row.pn}
                       </td>
                       <td className='min-w-64 border border-slate-300 px-3 py-2'>
-                        {row.description}
+                        <div>{row.description}</div>
+                        {row.note && (
+                          <div className='mt-0.5 text-xs italic text-red-500'>{row.note}</div>
+                        )}
                       </td>
-                      <td className='w-24 border border-slate-300 px-1 py-2 text-right'>
+                      <td className='w-24 border border-slate-300 px-1 py-2 text-center'>
                         <Input
                           type='number'
                           min={0}
@@ -627,14 +847,18 @@ export function InvoicePage() {
                               event.target.value
                             )
                           }
-                          className='ml-auto h-9 w-20 text-right'
+                          className='mx-auto h-9 w-20 text-center'
+                          data-pdf-hide
                           aria-label={`Qty ${row.description}`}
                         />
-                        <span className='mt-1 block text-xs text-slate-500'>
+                        <span className='hidden pdf-show block w-full text-center font-medium'>
+                          {row.qty}
+                        </span>
+                        <span data-pdf-hide className='mt-1 block text-xs text-slate-500'>
                           Sisa: {row.remainingQty} / {row.quotationQty}
                         </span>
                       </td>
-                      <td className='w-20 border border-slate-300 px-1 py-2'>
+                      <td className='w-20 border border-slate-300 px-1 py-2 text-center'>
                         {row.unit}
                       </td>
                       <td className='border border-slate-300 px-3 py-2 text-right'>
