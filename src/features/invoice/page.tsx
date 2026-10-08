@@ -219,7 +219,7 @@ export function InvoicePage() {
 
   useEffect(() => {
     if (!invoiceContentRef.current) return
-    let timeoutId: NodeJS.Timeout
+    let timeoutId: ReturnType<typeof setTimeout>
     const calculatePageCount = () => {
       const el = invoiceContentRef.current
       if (!el) return

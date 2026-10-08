@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Download, Printer, Save, CalendarIcon, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Download, Save, CalendarIcon, RefreshCw } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas-pro'
 import { Calendar } from '@/components/ui/calendar'

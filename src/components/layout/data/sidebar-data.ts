@@ -12,7 +12,6 @@ import {
   AudioWaveform,
   Command,
   GalleryVerticalEnd,
-  ShoppingCart,
   CalendarDays,
 } from 'lucide-react'
 import { type SidebarData } from '../types'

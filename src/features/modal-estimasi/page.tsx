@@ -918,7 +918,6 @@ export function ModalEstimasi({
   const totalModalSparepart = actualMode
     ? items.reduce((s, it) => s + (it.amountActual ?? 0), 0)
     : items.reduce((s, it) => s + it.amount, 0)
-  const usdRate = parseNum(costs.usdRate)
   const discountAmt = (parseNum(costs.discountPct) / 100) * totalModalSparepart
   const afterDiscount = totalModalSparepart + discountAmt
   const bankChargeIdr =
@@ -2983,7 +2982,7 @@ function QuotationReport({
   items,
   quotationRange,
   quotationDetails,
-  quotationSubtotal,
+  quotationSubtotal: _quotationSubtotal,
   quotationDiscount,
   quotationAfterDiscount,
   quotationDpp,
@@ -2998,7 +2997,7 @@ function QuotationReport({
   items: LineItem[]
   quotationRange: string
   quotationDetails: typeof defaultQuotationDetails
-  quotationSubtotal: number
+  quotationSubtotal?: number
   quotationDiscount: number
   quotationAfterDiscount: number
   quotationDpp: number
