@@ -140,18 +140,22 @@ export function TtbPage() {
           const drafts = JSON.parse(
             window.localStorage.getItem(ttbStorageKey) || '{}'
           ) as Record<string, { noPo?: string }>
-          return drafts[quotationNoQuo]?.noPo
+          const noPo = drafts[quotationNoQuo]?.noPo?.trim()
+          return noPo || undefined
         } catch {
           return undefined
         }
       })()
       setInvoiceNoPo(
-        draftNoPo ??
-          invoiceFormInfo.noPo ??
-          invoiceFormInfo.noPO ??
-          data.formInfo?.noPo ??
-          data.formInfo?.noPO ??
-          ''
+        [
+          draftNoPo,
+          invoiceFormInfo.noPo,
+          invoiceFormInfo.noPO,
+          data.formInfo?.noPo,
+          data.formInfo?.noPO,
+        ]
+          .map((value) => String(value ?? '').trim())
+          .find(Boolean) ?? ''
       )
       setInvoiceNoRfs(invoiceFormInfo.noRfs ?? '')
       setNoQuoInput(data.formInfo?.noQuo ?? noQuo)

@@ -60,6 +60,11 @@ const getInvoiceNumber = (invoice: InvoiceRecord) => {
   return noQuo.replace(/(-\d{4})$/, '-INV$1')
 }
 
+const getInvoicePoNumber = (invoice: InvoiceRecord) =>
+  [invoice.formInfo?.noPo, invoice.formInfo?.noPO]
+    .map((value) => String(value ?? '').trim())
+    .find(Boolean) ?? ''
+
 type AgingRow = {
   invoiceId: number
   id: number
@@ -126,7 +131,7 @@ const toAgingRow = (
     invoiceId: invoice.id,
     invoiceDate: safeInvoiceDate,
     invoiceNumber: getInvoiceNumber(invoice),
-    poNumber: String(invoice.formInfo?.noPo ?? invoice.formInfo?.noPO ?? '-'),
+    poNumber: getInvoicePoNumber(invoice) || '-',
     customer: String(
       invoice.formInfo?.pt ?? invoice.customerName ?? invoice.judul ?? '-'
     ),
@@ -236,13 +241,14 @@ export function SoaSatuan() {
           }
         }
 
-        if (
-          !base.formInfo?.noPo &&
-          (existing.formInfo?.noPo || invoice.formInfo?.noPo)
-        ) {
-          base.formInfo = {
-            ...base.formInfo,
-            noPo: existing.formInfo?.noPo || invoice.formInfo?.noPo,
+        if (!getInvoicePoNumber(base)) {
+          const poNumber =
+            getInvoicePoNumber(existing) || getInvoicePoNumber(invoice)
+          if (poNumber) {
+            base.formInfo = {
+              ...base.formInfo,
+              noPo: poNumber,
+            }
           }
         }
 
