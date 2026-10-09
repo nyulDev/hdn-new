@@ -198,6 +198,7 @@ export function InvoicePage() {
   const [selectedSavedInvoiceId, setSelectedSavedInvoiceId] = useState<
     number | null
   >(null)
+  const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null)
 
   useEffect(() => {
     void getEstimasiList()
@@ -279,15 +280,39 @@ export function InvoicePage() {
 
     try {
       const data = await getEstimasiByNoQuo(noQuo)
+      const normalizedNoQuo = String(data.formInfo?.noQuo ?? noQuo).trim()
+      const invoiceToEdit = invoices.find(
+        (invoice) =>
+          String(invoice.formInfo?.noQuo ?? invoice.noQuo ?? '').trim() ===
+          normalizedNoQuo
+      )
       setSelectedSavedInvoiceId(null)
+      setEditingInvoiceId(invoiceToEdit?.id ?? null)
       setLoadedInvoice(data)
-      setSelectedQuantities({})
+      setSelectedQuantities(
+        Object.fromEntries(
+          (invoiceToEdit?.items ?? []).map((item: any, index: number) => [
+            getItemKey(item, index),
+            parseQuotationNumber(item?.qty),
+          ])
+        )
+      )
       setNoPo(getTtbNoPo(data.formInfo?.noQuo ?? noQuo))
-      setLocation(data.formInfo?.supplyLocation || 'PLTU Suralaya')
-      setInvoiceDate(data.formInfo?.invoiceDate || getTodayInputDate())
+      setLocation(
+        invoiceToEdit?.formInfo?.supplyLocation ||
+          data.formInfo?.supplyLocation ||
+          'PLTU Suralaya'
+      )
+      setInvoiceDate(
+        invoiceToEdit?.formInfo?.invoiceDate ||
+          data.formInfo?.invoiceDate ||
+          getTodayInputDate()
+      )
+      setPaymentTerm(invoiceToEdit?.formInfo?.paymentTerm || '')
       setNoQuoInput(data.formInfo?.noQuo ?? noQuo)
     } catch (error) {
       setLoadedInvoice(null)
+      setEditingInvoiceId(null)
       setLocation('')
       alert('Gagal menarik data quotation: ' + (error as Error).message)
     } finally {
@@ -299,9 +324,11 @@ export function InvoicePage() {
     const invoice = invoices.find((item) => item.id === Number(invoiceId))
     if (!invoice) {
       setSelectedSavedInvoiceId(null)
+      setEditingInvoiceId(null)
       return
     }
 
+    setEditingInvoiceId(null)
     setSelectedSavedInvoiceId(invoice.id)
     setLoadedInvoice(invoice)
     setSelectedQuantities(
@@ -341,6 +368,7 @@ export function InvoicePage() {
     .filter(
       (invoice) =>
         selectedSavedInvoiceId === null &&
+        invoice.id !== editingInvoiceId &&
         invoice.noQuo === loadedInvoice?.formInfo?.noQuo
     )
     .flatMap((invoice) => invoice.items ?? [])
@@ -401,10 +429,7 @@ export function InvoicePage() {
       ? parseQuotationNumber(quotationDiscountAmount)
       : subtotal * (discount / 100)
   const totalAfterDiscount = subtotal - discountAmount
-  const dpp = (11 / 12) * totalAfterDiscount
   const ppnPct = Number(loadedInvoice?.formInfo?.quotationPpnPct ?? 12)
-  const ppn = dpp * (ppnPct / 100)
-  const totalInvoice = dpp + ppn
   const previewRows = showOriginalQuotation
     ? invoiceRows.map((row) => ({
         ...row,
@@ -482,18 +507,15 @@ export function InvoicePage() {
     setSaving(true)
     try {
       const targetNoQuo = loadedInvoice.formInfo?.noQuo ?? noQuoInput
-      const existingInvoice = selectedSavedInvoiceId
-        ? invoices.find((inv) => inv.id === selectedSavedInvoiceId)
-        : invoices.find(
-            (inv) =>
-              (inv.formInfo?.noQuo ?? inv.noQuo) === targetNoQuo
-          )
+      const existingInvoice = invoices.find(
+        (invoice) => invoice.id === editingInvoiceId
+      )
 
       const payload = {
         noQuo: targetNoQuo,
         judul: loadedInvoice.judul ?? 'Invoice',
         customerName: loadedInvoice.formInfo?.pt ?? '',
-        amount: totalInvoice,
+        amount: invoicePreviewTotal,
         status: existingInvoice?.status ?? 'belum_dibayar',
         formInfo: {
           ...(loadedInvoice.formInfo ?? {}),
@@ -501,8 +523,10 @@ export function InvoicePage() {
           noPo,
           invoiceDate,
           paymentTerm,
-          invoiceNo: selectedSavedInvoiceId ? loadedInvoice?.formInfo?.invoiceNo || invoiceNo : invoiceNo,
-          invoiceTotalAfterDiscount: totalAfterDiscount,
+          invoiceNo: existingInvoice
+            ? existingInvoice.formInfo?.invoiceNo || invoiceNo
+            : invoiceNo,
+          invoiceTotalAfterDiscount: invoicePreviewTotalAfterDiscount,
           quotationTotalAfterDiscount: previewTotalAfterDiscount,
           supplyLocation: location,
         },
@@ -518,15 +542,36 @@ export function InvoicePage() {
         costs: loadedInvoice.costs ?? {},
       }
 
-      if (existingInvoice) {
-        await updateInvoice(existingInvoice.id, payload)
-      } else {
-        await createInvoice(payload)
-      }
+      const savedInvoice = existingInvoice
+        ? await updateInvoice(existingInvoice.id, payload)
+        : await createInvoice(payload)
+      setEditingInvoiceId(savedInvoice.id)
+      setSelectedQuantities(
+        Object.fromEntries(
+          payload.items.map((item) => [
+            item.itemKey,
+            parseQuotationNumber(item.qty),
+          ])
+        )
+      )
+      setLoadedInvoice((current) =>
+        current
+          ? {
+              ...current,
+              formInfo: {
+                ...current.formInfo,
+                ...savedInvoice.formInfo,
+              },
+            }
+          : current
+      )
       const refreshedInvoices = await getInvoices()
       setInvoices(refreshedInvoices)
-      setSelectedQuantities({})
-      alert('Invoice berhasil disimpan. Sisa qty sudah diperbarui.')
+      alert(
+        existingInvoice
+          ? 'Invoice berhasil diperbarui.'
+          : 'Invoice berhasil disimpan.'
+      )
     } catch (error) {
       alert('Gagal menyimpan invoice: ' + (error as Error).message)
     } finally {
@@ -560,6 +605,7 @@ export function InvoicePage() {
                 const selectedNoQuo = event.target.value
                 setNoQuoInput(selectedNoQuo)
                 setSelectedSavedInvoiceId(null)
+                setEditingInvoiceId(null)
                 if (
                   quotationList.some(
                     (quotation) => quotation.noQuo === selectedNoQuo
@@ -604,6 +650,7 @@ export function InvoicePage() {
                 setNoQuoInput('')
                 setLoadedInvoice(null)
                 setSelectedSavedInvoiceId(null)
+                setEditingInvoiceId(null)
                 setSelectedQuantities({})
                 setPaymentTerm('')
               }}
@@ -639,7 +686,11 @@ export function InvoicePage() {
                   onClick={() => void handleSaveInvoice()}
                   disabled={saving}
                 >
-                  {saving ? 'Menyimpan...' : 'Simpan Invoice'}
+                  {saving
+                    ? 'Menyimpan...'
+                    : editingInvoiceId !== null
+                      ? 'Perbarui Invoice'
+                      : 'Simpan Invoice'}
                 </Button>
               )}
               <Button variant='outline' onClick={() => void handleDownloadPdf()} className='gap-1.5'>

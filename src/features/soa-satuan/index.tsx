@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, Search } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  CheckCircle2,
+  Download,
+  Search,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { getEstimasiList } from '@/lib/api/estimasi'
 import {
@@ -96,7 +102,11 @@ const toAgingRow = (
   referenceDate: Date
 ): AgingRow => {
   const invoiceDate = new Date(
-    String(invoice.formInfo?.tanggal ?? invoice.createdAt)
+    String(
+      invoice.formInfo?.invoiceDate ??
+        invoice.formInfo?.tanggal ??
+        invoice.createdAt
+    )
   )
   const safeInvoiceDate = Number.isNaN(invoiceDate.getTime())
     ? new Date(invoice.createdAt)
@@ -138,6 +148,7 @@ export function SoaSatuan() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
   const [selectedPt, setSelectedPt] = useState('all')
   const [search, setSearch] = useState('')
+  const [dateSortOrder, setDateSortOrder] = useState<'asc' | 'desc'>('asc')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeQuotationNumbers, setActiveQuotationNumbers] =
@@ -239,10 +250,25 @@ export function SoaSatuan() {
       }
     }
 
-    return Array.from(latestPerInvoiceNumber.values()).map((invoice, index) =>
-      toAgingRow(invoice, index, referenceDate)
-    )
-  }, [activeQuotationNumbers, invoices, referenceDate])
+    return Array.from(latestPerInvoiceNumber.values())
+      .map((invoice, index) => toAgingRow(invoice, index, referenceDate))
+      .sort((first, second) => {
+        const firstDate = first.invoiceDate.getTime()
+        const secondDate = second.invoiceDate.getTime()
+        const firstDateIsInvalid = Number.isNaN(firstDate)
+        const secondDateIsInvalid = Number.isNaN(secondDate)
+        if (firstDateIsInvalid !== secondDateIsInvalid) {
+          return firstDateIsInvalid ? 1 : -1
+        }
+        const dateDifference =
+          (firstDate - secondDate) * (dateSortOrder === 'asc' ? 1 : -1)
+        return (
+          dateDifference ||
+          first.invoiceNumber.localeCompare(second.invoiceNumber)
+        )
+      })
+      .map((row, index) => ({ ...row, id: index + 1 }))
+  }, [activeQuotationNumbers, dateSortOrder, invoices, referenceDate])
   const customers = useMemo(
     () => [...new Set(allRows.map((row) => row.customer))].sort(),
     [allRows]
@@ -505,7 +531,34 @@ export function SoaSatuan() {
               <thead>
                 <tr className='border-b text-left font-medium'>
                   <th className='px-2 py-3'>No</th>
-                  <th className='px-2 py-3 whitespace-nowrap'>INV Date</th>
+                  <th className='px-2 py-3 whitespace-nowrap'>
+                    <button
+                      type='button'
+                      onClick={() =>
+                        setDateSortOrder((current) =>
+                          current === 'asc' ? 'desc' : 'asc'
+                        )
+                      }
+                      aria-label={`Urutkan tanggal ${
+                        dateSortOrder === 'asc'
+                          ? 'terbaru ke terlama'
+                          : 'terlama ke terbaru'
+                      }`}
+                      title={
+                        dateSortOrder === 'asc'
+                          ? 'Urutan tanggal: terlama ke terbaru'
+                          : 'Urutan tanggal: terbaru ke terlama'
+                      }
+                      className='inline-flex items-center gap-1 hover:text-foreground'
+                    >
+                      INV Date
+                      {dateSortOrder === 'asc' ? (
+                        <ArrowUp className='size-4' aria-hidden='true' />
+                      ) : (
+                        <ArrowDown className='size-4' aria-hidden='true' />
+                      )}
+                    </button>
+                  </th>
                   <th className='px-2 py-3 whitespace-nowrap'>Invoice No</th>
                   <th className='px-2 py-3 whitespace-nowrap'>PO NO</th>
                   <th className='px-2 py-3 whitespace-nowrap'>Nama Kapal</th>

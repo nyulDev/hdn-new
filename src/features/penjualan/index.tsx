@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search as SearchIcon } from 'lucide-react'
+import { ArrowDown, ArrowUp, Search as SearchIcon } from 'lucide-react'
 import { getCustomers, type Customer } from '@/lib/api/customers'
 import {
   getEstimasiByNoQuo,
@@ -102,7 +102,11 @@ const toSalesRow = (
 
   return {
     id: index + 1,
-    date: String(invoice.formInfo?.tanggal ?? invoice.createdAt),
+    date: String(
+      invoice.formInfo?.invoiceDate ??
+        invoice.formInfo?.tanggal ??
+        invoice.createdAt
+    ),
     customer: String(
       invoice.formInfo?.pt ?? invoice.customerName ?? invoice.judul ?? '-'
     ),
@@ -126,6 +130,7 @@ export function Penjualan() {
   const [activeQuotationNumbers, setActiveQuotationNumbers] =
     useState<Set<string> | null>(null)
   const [search, setSearch] = useState('')
+  const [dateSortOrder, setDateSortOrder] = useState<'asc' | 'desc'>('asc')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -209,7 +214,30 @@ export function Penjualan() {
           .toLowerCase()
           .includes(query)
       })
-  }, [activeQuotationNumbers, customers, invoices, quotations, search])
+      .sort((first, second) => {
+        const firstDate = new Date(first.date).getTime()
+        const secondDate = new Date(second.date).getTime()
+        const firstDateIsInvalid = Number.isNaN(firstDate)
+        const secondDateIsInvalid = Number.isNaN(secondDate)
+        if (firstDateIsInvalid !== secondDateIsInvalid) {
+          return firstDateIsInvalid ? 1 : -1
+        }
+        const dateDifference =
+          (firstDate - secondDate) * (dateSortOrder === 'asc' ? 1 : -1)
+        return (
+          dateDifference ||
+          first.invoiceNumber.localeCompare(second.invoiceNumber)
+        )
+      })
+      .map((row, index) => ({ ...row, id: index + 1 }))
+  }, [
+    activeQuotationNumbers,
+    customers,
+    dateSortOrder,
+    invoices,
+    quotations,
+    search,
+  ])
 
   const totals = useMemo(
     () =>
@@ -273,7 +301,32 @@ export function Penjualan() {
             <thead>
               <tr className='border-b bg-muted/30 text-left font-semibold'>
                 <th className='w-12 px-2 py-4'>No</th>
-                <th className='w-28 px-2 py-4'>Tanggal</th>
+                <th className='w-28 px-2 py-4'>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setDateSortOrder((current) =>
+                        current === 'asc' ? 'desc' : 'asc'
+                      )
+                    }
+                    aria-label={`Urutkan tanggal ${
+                      dateSortOrder === 'asc' ? 'terbaru ke terlama' : 'terlama ke terbaru'
+                    }`}
+                    title={
+                      dateSortOrder === 'asc'
+                        ? 'Urutan tanggal: terlama ke terbaru'
+                        : 'Urutan tanggal: terbaru ke terlama'
+                    }
+                    className='inline-flex items-center gap-1 hover:text-foreground'
+                  >
+                    Tanggal
+                    {dateSortOrder === 'asc' ? (
+                      <ArrowUp className='size-4' aria-hidden='true' />
+                    ) : (
+                      <ArrowDown className='size-4' aria-hidden='true' />
+                    )}
+                  </button>
+                </th>
                 <th className='w-44 px-2 py-4'>Customer</th>
                 <th className='w-56 px-2 py-4'>No. Invoice</th>
                 <th className='px-2 py-4 text-right'>Total After Disc.</th>
