@@ -534,7 +534,7 @@ export function ModalEstimasi({
   const [estimasiPct, setEstimasiPct] = useState('')
   const [quotationDiscountPct, setQuotationDiscountPct] = useState('10')
   const [quotationDiscountAmount, setQuotationDiscountAmount] = useState('')
-  const [quotationPpnPct, setQuotationPpnPct] = useState('12')
+  const quotationPpnPct = '12'
   const [showQuotationTable, setShowQuotationTable] = useState(!quotationMode)
   const [quotationDetails, setQuotationDetails] = useState(
     defaultQuotationDetails
@@ -634,7 +634,6 @@ export function ModalEstimasi({
       setQuotationDiscountAmount(
         String(loadedFormInfo.quotationDiscountAmount ?? '')
       )
-      setQuotationPpnPct(String(loadedFormInfo.quotationPpnPct ?? '12'))
       setItems(data.items || [])
       setCosts({
         ...defaultCosts,
@@ -883,7 +882,6 @@ export function ModalEstimasi({
     setEstimasiPct('')
     setQuotationDiscountPct('10')
     setQuotationDiscountAmount('')
-    setQuotationPpnPct('12')
     setQuotationDetails(defaultQuotationDetails)
     setShowQuotationTable(!quotationMode)
   }, [quotationMode])
@@ -2064,16 +2062,7 @@ export function ModalEstimasi({
                             label={
                               <span className='flex items-center gap-1'>
                                 PPN
-                                <Input
-                                  type='number'
-                                  min='0'
-                                  max='100'
-                                  value={quotationPpnPct}
-                                  onChange={(event) =>
-                                    setQuotationPpnPct(event.target.value)
-                                  }
-                                  className='h-6 w-14 rounded-none border-dotted px-1 text-right text-xs font-normal shadow-none focus-visible:ring-1'
-                                />
+                                <span>{quotationPpnPct}</span>
                                 %
                               </span>
                             }
