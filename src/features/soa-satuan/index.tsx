@@ -23,9 +23,20 @@ const formatCurrency = (value: number) =>
 
 const formatDate = (value: Date | string | undefined) => {
   if (!value) return '-'
-  const date = value instanceof Date ? value : new Date(value)
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(
+          /^\d{4}-\d{2}-\d{2}$/.test(value)
+            ? `${value}T00:00:00`
+            : value
+        )
   if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleDateString('id-ID')
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 const formatLongDate = (value: Date) =>

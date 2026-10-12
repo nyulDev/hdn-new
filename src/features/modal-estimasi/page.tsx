@@ -92,6 +92,9 @@ interface FormInfo {
   pt: string
   kapal: string
   dept: string
+  machineName: string
+  machineDetail: string
+  machineMaker: string
   noQuo: string
   noRfs: string
   subject: string
@@ -176,7 +179,10 @@ const defaultFormInfo: FormInfo = {
   tanggal: new Date().toISOString().slice(0, 10),
   pt: '',
   kapal: '',
-  dept: '',
+  dept: 'HDN',
+  machineName: '',
+  machineDetail: '',
+  machineMaker: '',
   noQuo: '',
   noRfs: '',
   subject: '',
@@ -611,6 +617,7 @@ export function ModalEstimasi({
       const loadedFormInfo = {
         ...defaultFormInfo,
         ...(data.formInfo || {}),
+        dept: data.formInfo?.dept || defaultFormInfo.dept,
         supplyLocation:
           data.formInfo?.supplyLocation || defaultFormInfo.supplyLocation,
       }
@@ -1401,95 +1408,155 @@ export function ModalEstimasi({
                 </div>
               )}
               {!quotationMode && (
-                <div className='col-span-full flex min-w-0 items-center gap-5'>
-                  <div className='flex shrink-0 items-center gap-2'>
+                <div className='col-span-full flex min-w-0 flex-col items-start gap-2'>
+                  <div className='flex items-center gap-2'>
                     <Label className='w-20 shrink-0 text-xs font-semibold text-muted-foreground'>
                       Dept
                     </Label>
-                    <Input
+                    <select
+                      aria-label='Dept'
                       value={formInfo.dept}
                       onChange={(e) => updateInfo('dept', e.target.value)}
-                      placeholder='HDN'
-                      className='h-7 w-16 flex-none text-xs'
-                    />
+                      className='h-7 w-24 flex-none rounded-md border border-input bg-background px-2 text-xs'
+                    >
+                      <option value='HDN'>HDN</option>
+                      <option value='HTU'>HTU</option>
+                    </select>
                   </div>
-                  <div className='flex shrink-0 items-center gap-2'>
-                    <Label className='w-auto shrink-0 text-xs font-semibold text-muted-foreground'>
-                      No. Quo
-                    </Label>
-                    <Input
-                      value={noQuoNumber}
-                      onChange={(e) => setNoQuoNumber(e.target.value)}
-                      placeholder='0000'
-                      className='h-8 w-20 flex-none text-xs'
-                    />
-                    <div className='flex items-center gap-0'>
-                      {formInfo.revisi && formInfo.revisi !== '0' && (
-                        <>
-                          <span className='text-xs text-muted-foreground'>
-                            -
-                          </span>
-                          <Input
-                            value={`R${formInfo.revisi}`}
-                            readOnly
-                            className='h-8 w-10 flex-none cursor-default border-dashed bg-amber-50 px-1 text-center text-xs text-amber-600 select-none focus-visible:ring-0'
-                          />
-                        </>
-                      )}
-                      <span className='text-xs text-muted-foreground'>-</span>
-                      {deliveryCost && (
-                        <>
-                          <Input
-                            value='DC'
-                            readOnly
-                            className='h-8 w-10 flex-none cursor-default border-dashed bg-blue-50 px-1 text-center text-xs text-blue-600 select-none focus-visible:ring-0'
-                          />
-                          <span className='text-xs text-muted-foreground'>
-                            -
-                          </span>
-                        </>
-                      )}
-                      <Input
-                        value='PH'
-                        readOnly
-                        className='h-8 w-10 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
-                      />
-                      <span className='text-xs text-muted-foreground'>-</span>
-                      <Input
-                        value={formInfo.dept.trim().toUpperCase() || 'HDN'}
-                        readOnly
-                        className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
-                      />
-                      <span className='text-xs text-muted-foreground'>-</span>
-                      <Input
-                        value={new Date().getFullYear()}
-                        readOnly
-                        className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
-                      />
+                  {formInfo.dept === 'HTU' && (
+                    <div className='grid w-full grid-cols-3 gap-3'>
+                      <div className='flex min-w-0 items-center gap-2'>
+                        <Label
+                          htmlFor='machine-name'
+                          className='shrink-0 text-xs font-semibold text-muted-foreground'
+                        >
+                          Nama Mesin
+                        </Label>
+                        <Input
+                          id='machine-name'
+                          value={formInfo.machineName}
+                          onChange={(e) =>
+                            updateInfo('machineName', e.target.value)
+                          }
+                          placeholder='Nama Mesin'
+                          className='h-7 min-w-0 flex-1 text-xs'
+                        />
+                      </div>
+                      <div className='flex min-w-0 items-center gap-2'>
+                        <Label
+                          htmlFor='machine-detail'
+                          className='shrink-0 text-xs font-semibold text-muted-foreground'
+                        >
+                          Detail Mesin
+                        </Label>
+                        <Input
+                          id='machine-detail'
+                          value={formInfo.machineDetail}
+                          onChange={(e) =>
+                            updateInfo('machineDetail', e.target.value)
+                          }
+                          placeholder='Detail Mesin'
+                          className='h-7 min-w-0 flex-1 text-xs'
+                        />
+                      </div>
+                      <div className='flex min-w-0 items-center gap-2'>
+                        <Label
+                          htmlFor='machine-maker'
+                          className='shrink-0 text-xs font-semibold text-muted-foreground'
+                        >
+                          Maker
+                        </Label>
+                        <Input
+                          id='machine-maker'
+                          value={formInfo.machineMaker}
+                          onChange={(e) =>
+                            updateInfo('machineMaker', e.target.value)
+                          }
+                          placeholder='Maker'
+                          className='h-7 min-w-0 flex-1 text-xs'
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className='flex min-w-0 flex-1 items-center gap-3'>
-                    <div className='flex min-w-0 flex-1 items-center gap-2'>
-                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
-                        No. RFS
+                  )}
+                  <div className='flex w-full min-w-0 flex-wrap items-center gap-x-5 gap-y-2'>
+                    <div className='flex shrink-0 items-center gap-2'>
+                      <Label className='w-auto shrink-0 text-xs font-semibold text-muted-foreground'>
+                        No. Quo
                       </Label>
                       <Input
-                        value={formInfo.noRfs}
-                        onChange={(e) => updateInfo('noRfs', e.target.value)}
-                        placeholder='Nomor RFS'
-                        className='h-7 min-w-0 flex-1 text-xs'
+                        value={noQuoNumber}
+                        onChange={(e) => setNoQuoNumber(e.target.value)}
+                        placeholder='0000'
+                        className='h-8 w-20 flex-none text-xs'
                       />
+                      <div className='flex items-center gap-0'>
+                        {formInfo.revisi && formInfo.revisi !== '0' && (
+                          <>
+                            <span className='text-xs text-muted-foreground'>
+                              -
+                            </span>
+                            <Input
+                              value={`R${formInfo.revisi}`}
+                              readOnly
+                              className='h-8 w-10 flex-none cursor-default border-dashed bg-amber-50 px-1 text-center text-xs text-amber-600 select-none focus-visible:ring-0'
+                            />
+                          </>
+                        )}
+                        <span className='text-xs text-muted-foreground'>-</span>
+                        {deliveryCost && (
+                          <>
+                            <Input
+                              value='DC'
+                              readOnly
+                              className='h-8 w-10 flex-none cursor-default border-dashed bg-blue-50 px-1 text-center text-xs text-blue-600 select-none focus-visible:ring-0'
+                            />
+                            <span className='text-xs text-muted-foreground'>
+                              -
+                            </span>
+                          </>
+                        )}
+                        <Input
+                          value='PH'
+                          readOnly
+                          className='h-8 w-10 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                        />
+                        <span className='text-xs text-muted-foreground'>-</span>
+                        <Input
+                          value={formInfo.dept.trim().toUpperCase() || 'HDN'}
+                          readOnly
+                          className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                        />
+                        <span className='text-xs text-muted-foreground'>-</span>
+                        <Input
+                          value={new Date().getFullYear()}
+                          readOnly
+                          className='h-8 w-14 flex-none cursor-default border-dashed bg-muted/40 px-1 text-center text-xs text-muted-foreground select-none focus-visible:ring-0'
+                        />
+                      </div>
                     </div>
-                    <div className='flex min-w-0 flex-1 items-center gap-2'>
-                      <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
-                        Subject
-                      </Label>
-                      <Input
-                        value={formInfo.subject}
-                        onChange={(e) => updateInfo('subject', e.target.value)}
-                        placeholder='Subject'
-                        className='h-7 min-w-0 flex-1 text-xs'
-                      />
+                    <div className='flex min-w-0 flex-1 flex-wrap items-center gap-3'>
+                      <div className='flex min-w-0 flex-1 items-center gap-2'>
+                        <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                          No. RFS
+                        </Label>
+                        <Input
+                          value={formInfo.noRfs}
+                          onChange={(e) => updateInfo('noRfs', e.target.value)}
+                          placeholder='Nomor RFS'
+                          className='h-7 min-w-0 flex-1 text-xs'
+                        />
+                      </div>
+                      <div className='flex min-w-0 flex-1 items-center gap-2'>
+                        <Label className='shrink-0 text-xs font-semibold text-muted-foreground'>
+                          Subject
+                        </Label>
+                        <Input
+                          value={formInfo.subject}
+                          onChange={(e) => updateInfo('subject', e.target.value)}
+                          placeholder='Subject'
+                          className='h-7 min-w-0 flex-1 text-xs'
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2847,6 +2914,9 @@ function EstimasiReport({
       <div>
         <div className='text-base font-bold'>{formInfo.pt || '-'}</div>
         <div className='text-sm'>{formInfo.kapal || '-'}</div>
+        <div className='text-sm'>Nama Mesin: {formInfo.machineName || '-'}</div>
+        <div className='text-sm'>Detail Mesin: {formInfo.machineDetail || '-'}</div>
+        <div className='text-sm'>Maker: {formInfo.machineMaker || '-'}</div>
       </div>
       <table className='w-full border-collapse text-xs'>
         <thead>
@@ -3079,6 +3149,9 @@ function QuotationReport({
             <div className='font-bold'>{formInfo.pt || '-'}</div>
             <div>{formInfo.noRfs || formInfo.noQuo || '-'}</div>
             <div>{formInfo.kapal || '-'}</div>
+            <div>Nama Mesin: {formInfo.machineName || '-'}</div>
+            <div>Detail Mesin: {formInfo.machineDetail || '-'}</div>
+            <div>Maker: {formInfo.machineMaker || '-'}</div>
             <div>Attn: {customer?.kontak || '-'}</div>
           </div>
         )}

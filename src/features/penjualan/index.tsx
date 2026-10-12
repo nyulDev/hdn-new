@@ -23,9 +23,18 @@ const formatCurrency = (value: number) =>
 
 const formatDate = (value: unknown) => {
   if (!value) return '-'
-  const date = new Date(String(value))
+  const dateValue = String(value)
+  const date = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+      ? `${dateValue}T00:00:00`
+      : dateValue
+  )
   if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleDateString('id-ID')
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 const getInvoiceNumber = (invoice: InvoiceRecord) => {
