@@ -529,7 +529,7 @@ export function TtbPage() {
                   className='inline-flex h-6 w-48 border-0 border-b border-dashed border-slate-400 px-1 text-xs shadow-none focus-visible:ring-0 print:hidden'
                   aria-label='Nomor PO'
                 />
-                <span className='hidden print:inline'>
+                <span data-pdf-show className='hidden text-xs print:inline'>
                   {invoiceNoPo || '-'}
                 </span>
               </div>
