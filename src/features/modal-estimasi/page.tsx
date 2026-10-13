@@ -577,7 +577,7 @@ export function ModalEstimasi({
                   modalAktualSubtotal: subTotal,
                   modalAktualTotal: grandTotal,
                 }
-              : formInfo,
+              : { ...formInfo, modalEstimasiSubtotal: subTotal },
         items,
         costs,
         status,

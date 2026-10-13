@@ -88,7 +88,6 @@ export const getModalSubtotal = (data: {
   const discountPct = parseQuotationNumber(costs.discountPct)
   const afterDiscount =
     totalModalSparepart + (discountPct / 100) * totalModalSparepart
-  const usdRate = parseQuotationNumber(costs.usdRate)
   const otherCostsTotal = (
     (costs.otherCosts as Array<Record<string, unknown>>) ?? []
   ).reduce(
@@ -112,15 +111,9 @@ export const getModalSubtotal = (data: {
     parseQuotationNumber(costs.qtySeaDoor) *
       parseQuotationNumber(costs.seaDoorCbm) +
     parseQuotationNumber(costs.qtyLocalCost) *
-      parseQuotationNumber(costs.localCostUsd) *
-      usdRate +
+      parseQuotationNumber(costs.localCostUsd) +
     parseQuotationNumber(costs.qtyFeeKurir) *
       parseQuotationNumber(costs.feeKurir) +
-    parseQuotationNumber(costs.qtyTruk) * parseQuotationNumber(costs.trukLs) +
-    parseQuotationNumber(costs.qtyServiceboat) *
-      parseQuotationNumber(costs.serviceboatLs) +
-    parseQuotationNumber(costs.qtyLainLain) *
-      parseQuotationNumber(costs.lainLainLs) +
     otherCostsTotal
 
   return afterDiscount + costsTotal
