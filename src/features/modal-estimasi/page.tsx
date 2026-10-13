@@ -3045,7 +3045,7 @@ function QuotationReport({
   items,
   quotationRange,
   quotationDetails,
-  quotationSubtotal: _quotationSubtotal,
+  quotationSubtotal,
   quotationDiscount,
   quotationAfterDiscount,
   quotationDpp,
@@ -3060,7 +3060,7 @@ function QuotationReport({
   items: LineItem[]
   quotationRange: string
   quotationDetails: typeof defaultQuotationDetails
-  quotationSubtotal?: number
+  quotationSubtotal: number
   quotationDiscount: number
   quotationAfterDiscount: number
   quotationDpp: number
@@ -3248,6 +3248,7 @@ function QuotationReport({
         </div>
         {!inquiryMode && (
           <div className='self-start'>
+            <ReportRow label='Sub Total' value={quotationSubtotal} />
             <ReportRow label={`Discount (${quotationDiscountPct}%)`} value={-quotationDiscount} />
             <ReportRow
               label='Total after discount'
