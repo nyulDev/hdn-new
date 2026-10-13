@@ -3151,7 +3151,7 @@ function QuotationReport({
           {!inquiryMode && (
             <>
               <span className='font-bold'>CUSTOMER ID</span>
-              <span>: {formInfo.pt || '-'}</span>
+              <span>: {customer?.id || '-'}</span>
             </>
           )}
           <span className='font-bold'>DATE</span>
