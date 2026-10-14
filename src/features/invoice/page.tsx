@@ -444,7 +444,7 @@ export function InvoicePage() {
       ? parseQuotationNumber(quotationDiscountAmount)
       : previewSubtotal * (discount / 100)
   const previewTotalAfterDiscount = previewSubtotal - previewDiscountAmount
-  const previewDpp = (11 / 12) * previewTotalAfterDiscount
+  const previewDpp = previewTotalAfterDiscount
   const previewPpn = previewDpp * (ppnPct / 100)
   const previewTotalInvoice = previewTotalAfterDiscount + previewPpn
   const estimatedPageCount = pdfPageCount
@@ -482,7 +482,7 @@ export function InvoicePage() {
       : totalAfterDiscount
   const invoicePreviewDiscountAmount =
     subtotal - invoicePreviewTotalAfterDiscount
-  const invoicePreviewDpp = (11 / 12) * invoicePreviewTotalAfterDiscount
+  const invoicePreviewDpp = invoicePreviewTotalAfterDiscount
   const invoicePreviewPpn = invoicePreviewDpp * (ppnPct / 100)
   const invoicePreviewTotal = invoicePreviewTotalAfterDiscount + invoicePreviewPpn
   const handleQuantityChange = (itemKey: string, value: string) => {

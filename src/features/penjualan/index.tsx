@@ -98,7 +98,7 @@ const toSalesRow = (
   const ppnPct = parseQuotationNumber(
     quotationData.formInfo?.quotationPpnPct ?? 12
   )
-  const dpp = (11 / 12) * totalAfterDiscount
+  const dpp = totalAfterDiscount
   const ppn = dpp * (ppnPct / 100)
   const modalRequested = getModalSubtotal(quotationData)
   const actualPurchase = getActualModalSubtotal(invoice)

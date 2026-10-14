@@ -971,7 +971,7 @@ export function ModalEstimasi({
     ? parseNum(quotationDiscountAmount)
     : calculatedQuotationDiscount
   const quotationAfterDiscount = quotationSubtotal - quotationDiscount
-  const quotationDpp = (11 / 12) * quotationAfterDiscount
+  const quotationDpp = quotationAfterDiscount
   const quotationPpn = quotationDpp * (parseNum(quotationPpnPct) / 100)
   const quotationTotal = quotationAfterDiscount + quotationPpn
   // Jika SKTD aktif → TOTAL (IDR) = Total after discount (tanpa PPN)
