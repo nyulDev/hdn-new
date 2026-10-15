@@ -143,6 +143,35 @@ export function InvoicePage() {
         el.style.background = 'transparent'
         el.style.padding = '0'
       })
+
+      const invoiceTable = clone.querySelector('table')
+      if (invoiceTable) {
+        invoiceTable
+          .querySelectorAll<HTMLElement>('tr > [data-pdf-hide]')
+          .forEach((cell) => cell.remove())
+        invoiceTable.style.width = '100%'
+        invoiceTable.style.maxWidth = '100%'
+        invoiceTable.style.tableLayout = 'fixed'
+        invoiceTable.style.fontSize = '12px'
+
+        const columnWidths = ['5%', '19%', '26%', '9%', '8%', '17%', '16%']
+        const columnGroup = document.createElement('colgroup')
+        columnWidths.forEach((width) => {
+          const column = document.createElement('col')
+          column.style.width = width
+          columnGroup.appendChild(column)
+        })
+        invoiceTable.insertBefore(columnGroup, invoiceTable.firstChild)
+
+        invoiceTable
+          .querySelectorAll<HTMLElement>('th, td')
+          .forEach((cell) => {
+            cell.style.minWidth = '0'
+            cell.style.padding = '4px 3px'
+            cell.style.whiteSpace = 'normal'
+            cell.style.overflowWrap = 'anywhere'
+          })
+      }
       document.body.appendChild(clone)
 
       const canvas = await html2canvas(clone, {
