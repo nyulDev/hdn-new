@@ -173,6 +173,19 @@ const fmtInputDisplay = (s: string): string => {
   return intFormatted + decStr
 }
 
+const getTtbSupplyLocation = (noQuo: string): string | undefined => {
+  if (typeof window === 'undefined') return undefined
+
+  try {
+    const drafts = JSON.parse(
+      window.localStorage.getItem('ttb-drafts') || '{}'
+    ) as Record<string, { location?: string }>
+    return drafts[noQuo]?.location
+  } catch {
+    return undefined
+  }
+}
+
 // ─── Default data ─────────────────────────────────────────────────────────────
 
 const defaultFormInfo: FormInfo = {
@@ -617,12 +630,15 @@ export function ModalEstimasi({
     try {
       const data = await getEstimasiByNoQuo(noQuo)
       setEditingEstimasiId(data.id)
+      const ttbSupplyLocation = getTtbSupplyLocation(noQuo)
       const loadedFormInfo = {
         ...defaultFormInfo,
         ...(data.formInfo || {}),
         dept: data.formInfo?.dept || defaultFormInfo.dept,
         supplyLocation:
-          data.formInfo?.supplyLocation || defaultFormInfo.supplyLocation,
+          ttbSupplyLocation ??
+          data.formInfo?.supplyLocation ??
+          defaultFormInfo.supplyLocation,
       }
       setFormInfo(loadedFormInfo)
       if (loadedFormInfo.noQuo) {
