@@ -306,7 +306,9 @@ export function ModalEstimasi({
   const [customers, setCustomers] = useState<Customer[]>([])
 
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [inquiryDialogOpen, setInquiryDialogOpen] = useState(false)
+  const [inquiryDialogMode, setInquiryDialogMode] = useState<
+    'inquery' | 'opsi' | null
+  >(null)
   const inquiryContentRef = useRef<HTMLDivElement>(null)
 
   const handleDownloadInquiryPdf = async () => {
@@ -362,9 +364,10 @@ export function ModalEstimasi({
         }
       }
 
+      const filenamePrefix = inquiryDialogMode === 'opsi' ? 'Opsi' : 'Inquery'
       const filename = formInfo.noQuo
-        ? `Inquery-${formInfo.noQuo}.pdf`
-        : 'Inquery.pdf'
+        ? `${filenamePrefix}-${formInfo.noQuo}.pdf`
+        : `${filenamePrefix}.pdf`
       pdf.save(filename)
     } catch (err) {
       console.error('Download PDF error:', err)
@@ -1156,10 +1159,21 @@ export function ModalEstimasi({
                 variant='outline'
                 size='sm'
                 className='gap-1.5'
-                onClick={() => setInquiryDialogOpen(true)}
+                onClick={() => setInquiryDialogMode('inquery')}
               >
                 <FileText className='h-3.5 w-3.5' />
                 Inquery
+              </Button>
+            )}
+            {quotationMode && (
+              <Button
+                variant='outline'
+                size='sm'
+                className='gap-1.5'
+                onClick={() => setInquiryDialogMode('opsi')}
+              >
+                <FileText className='h-3.5 w-3.5' />
+                Opsi
               </Button>
             )}
             <Button
@@ -2708,9 +2722,16 @@ export function ModalEstimasi({
       </Dialog>
 
       {/* Dialog Inquery */}
-      <Dialog open={inquiryDialogOpen} onOpenChange={setInquiryDialogOpen}>
+      <Dialog
+        open={inquiryDialogMode !== null}
+        onOpenChange={(open) => {
+          if (!open) setInquiryDialogMode(null)
+        }}
+      >
         <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-5xl'>
-          <DialogTitle className='sr-only'>Inquery</DialogTitle>
+          <DialogTitle className='sr-only'>
+            {inquiryDialogMode === 'opsi' ? 'Opsi' : 'Inquery'}
+          </DialogTitle>
           <div ref={inquiryContentRef}>
             <QuotationReport
               formInfo={formInfo}
@@ -2727,12 +2748,13 @@ export function ModalEstimasi({
               quotationDiscountPct={quotationDiscountPct}
               customers={customers}
               inquiryMode
+              showPrices={inquiryDialogMode === 'opsi'}
             />
           </div>
           <DialogFooter className='print:hidden'>
             <Button
               variant='outline'
-              onClick={() => setInquiryDialogOpen(false)}
+              onClick={() => setInquiryDialogMode(null)}
             >
               Tutup
             </Button>
@@ -3055,6 +3077,7 @@ function QuotationReport({
   quotationDiscountPct,
   customers,
   inquiryMode = false,
+  showPrices = false,
 }: {
   formInfo: FormInfo
   items: LineItem[]
@@ -3070,6 +3093,7 @@ function QuotationReport({
   quotationDiscountPct: string
   customers: Customer[]
   inquiryMode?: boolean
+  showPrices?: boolean
 }) {
   const reportDate = formInfo.tanggal
     ? new Date(`${formInfo.tanggal}T00:00:00`).toLocaleDateString('id-ID', {
@@ -3208,7 +3232,7 @@ function QuotationReport({
                 <td className='px-1.5 py-1'>
                   {item.qty} {item.unit}
                 </td>
-                {!inquiryMode && (
+                {(!inquiryMode || showPrices) && (
                   <>
                     <td className='px-1.5 py-1 text-right'>
                       {formatQuotationAmount(unitPrice)}
@@ -3218,7 +3242,7 @@ function QuotationReport({
                     </td>
                   </>
                 )}
-                {inquiryMode && (
+                {inquiryMode && !showPrices && (
                   <>
                     <td className='px-1.5 py-1' />
                     <td className='px-1.5 py-1' />

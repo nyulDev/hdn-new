@@ -265,11 +265,28 @@ export function TtbPage() {
 
   const handleDownloadPdf = async () => {
     if (!ttbContentRef.current) return
+    if (!ttbRows.some((row) => row.qty > 0)) {
+      alert('Pilih minimal satu item sebelum mengunduh PDF.')
+      return
+    }
+
     try {
       const clone = ttbContentRef.current.cloneNode(true) as HTMLElement
       clone.style.cssText =
         'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;'
 
+      clone
+        .querySelectorAll<HTMLElement>(
+          '[data-pdf-item="true"][data-pdf-selected="false"]'
+        )
+        .forEach((row) => row.remove())
+      clone
+        .querySelectorAll<HTMLElement>('[data-pdf-sequence]')
+        .forEach((cell, index) => {
+          cell.textContent = String(index + 1)
+        })
+      const pdfNoPo = clone.querySelector<HTMLElement>('[data-pdf-no-po]')
+      if (pdfNoPo) pdfNoPo.textContent = invoiceNoPo.trim() || '-'
       // Sembunyikan elemen bertanda data-pdf-hide
       clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach((el) => {
         el.style.display = 'none'
@@ -529,7 +546,11 @@ export function TtbPage() {
                   className='inline-flex h-6 w-48 border-0 border-b border-dashed border-slate-400 px-1 text-xs shadow-none focus-visible:ring-0 print:hidden'
                   aria-label='Nomor PO'
                 />
-                <span data-pdf-show className='hidden text-xs print:inline'>
+                <span
+                  data-pdf-show
+                  data-pdf-no-po
+                  className='hidden text-xs print:inline'
+                >
                   {invoiceNoPo || '-'}
                 </span>
               </div>
@@ -560,7 +581,12 @@ export function TtbPage() {
               <tbody>
                 {ttbRows.length > 0 ? (
                   ttbRows.map((row) => (
-                    <tr key={row.id} className='align-top'>
+                    <tr
+                      key={row.id}
+                      data-pdf-item='true'
+                      data-pdf-selected={row.qty > 0 ? 'true' : 'false'}
+                      className='align-top'
+                    >
                       <td data-pdf-hide className='w-10 border border-slate-200 px-1 py-2 text-center print:hidden'>
                         <Checkbox
                           checked={row.qty > 0}
@@ -570,7 +596,10 @@ export function TtbPage() {
                           aria-label={`Pilih ${row.description}`}
                         />
                       </td>
-                      <td className='w-10 border border-slate-200 px-1 py-2'>
+                      <td
+                        data-pdf-sequence
+                        className='w-10 border border-slate-200 px-1 py-2'
+                      >
                         {row.id}
                       </td>
                       <td className='border border-slate-200 px-3 py-2 whitespace-nowrap'>
