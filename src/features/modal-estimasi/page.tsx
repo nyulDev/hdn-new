@@ -425,6 +425,9 @@ export function ModalEstimasi({
     setFormInfo((prev) => ({
       ...prev,
       noRfs: doc.projectName || prev.noRfs,
+      machineName: doc.machineName || prev.machineName,
+      machineDetail: doc.machineDetail || prev.machineDetail,
+      machineMaker: doc.machineMaker || prev.machineMaker,
     }))
 
     // 2. Set Kurs USD jika ada

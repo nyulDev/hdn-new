@@ -10,6 +10,7 @@ import {
   Building2,
   Save,
   History,
+  FileText,
 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -21,6 +22,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -74,6 +76,9 @@ function VBadge({ idx, name }: { idx: number; name: string }) {
 
 export function VendorAnalytic() {
   const [projectName, setProjectName] = useState('')
+  const [machineName, setMachineName] = useState('')
+  const [machineDetail, setMachineDetail] = useState('')
+  const [machineMaker, setMachineMaker] = useState('')
   const [usdRate, setUsdRate] = useState('17500')
   const [vendorCount, setVendorCount] = useState(2)
   const [vendors, setVendors] = useState<VendorInfo[]>([{ name: 'Vendor 1' }, { name: 'Vendor 2' }, { name: 'Vendor 3' }])
@@ -81,8 +86,10 @@ export function VendorAnalytic() {
   const [collapsed, setCollapsed] = useState([false, false, false])
   const [history, setHistory] = useState<any[]>([])
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [isInquiryOpen, setIsInquiryOpen] = useState(false)
   const [currentId, setCurrentId] = useState<string | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
+  const inquiryContentRef = useRef<HTMLDivElement>(null)
   const rate = parseNum(usdRate) || 17500
 
   useEffect(() => {
@@ -98,6 +105,9 @@ export function VendorAnalytic() {
       id: docId,
       date: new Date().toISOString(),
       projectName,
+      machineName,
+      machineDetail,
+      machineMaker,
       usdRate,
       vendorCount,
       vendors,
@@ -113,6 +123,9 @@ export function VendorAnalytic() {
   const loadDoc = (doc: any) => {
     setCurrentId(doc.id)
     setProjectName(doc.projectName)
+    setMachineName(doc.machineName || '')
+    setMachineDetail(doc.machineDetail || '')
+    setMachineMaker(doc.machineMaker || '')
     setUsdRate(doc.usdRate)
     setVendorCount(doc.vendorCount)
     setVendors(doc.vendors)
@@ -130,6 +143,9 @@ export function VendorAnalytic() {
   const handleReset = () => {
     setItems([emptyItem()])
     setProjectName('')
+    setMachineName('')
+    setMachineDetail('')
+    setMachineMaker('')
     setCurrentId(null)
   }
 
@@ -195,6 +211,74 @@ export function VendorAnalytic() {
     } catch (e) { alert('Gagal export PDF: ' + String(e)) }
   }
 
+  const handleInquiryPdf = async () => {
+    if (!inquiryContentRef.current) {
+      alert('Konten Inquery tidak ditemukan')
+      return
+    }
+
+    let clone: HTMLElement | null = null
+    try {
+      clone = inquiryContentRef.current.cloneNode(true) as HTMLElement
+      clone.style.cssText =
+        'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:24px;'
+      document.body.appendChild(clone)
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+      })
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+      const margin = 8
+      const contentWidth = pdf.internal.pageSize.getWidth() - margin * 2
+      const contentHeight = pdf.internal.pageSize.getHeight() - margin * 2
+      const imageHeight = (canvas.height * contentWidth) / canvas.width
+      const pageHeightPx = Math.floor((contentHeight / contentWidth) * canvas.width)
+
+      for (let y = 0; y < canvas.height; y += pageHeightPx) {
+        if (y > 0) pdf.addPage()
+        const pageCanvas = document.createElement('canvas')
+        pageCanvas.width = canvas.width
+        pageCanvas.height = Math.min(pageHeightPx, canvas.height - y)
+        const context = pageCanvas.getContext('2d')
+        if (!context) throw new Error('Tidak dapat menyiapkan halaman PDF')
+        context.drawImage(
+          canvas,
+          0,
+          y,
+          canvas.width,
+          pageCanvas.height,
+          0,
+          0,
+          canvas.width,
+          pageCanvas.height
+        )
+        const pageImageHeight = (pageCanvas.height * contentWidth) / canvas.width
+        pdf.addImage(
+          pageCanvas.toDataURL('image/jpeg', 0.98),
+          'JPEG',
+          margin,
+          margin,
+          contentWidth,
+          y === 0 && imageHeight <= contentHeight
+            ? imageHeight
+            : pageImageHeight
+        )
+      }
+
+      pdf.save(`Inquery-${projectName || 'vendor'}.pdf`)
+    } catch (error) {
+      alert(`Gagal membuat PDF Inquery: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      clone?.remove()
+    }
+  }
+
   return (
     <>
       <Header><ThemeSwitch /><ProfileDropdown /></Header>
@@ -216,6 +300,9 @@ export function VendorAnalytic() {
             <Button variant='secondary' size='sm' onClick={() => void handlePdf()} className='gap-1.5'>
               <Download className='h-4 w-4' />Export PDF
             </Button>
+            <Button variant='outline' size='sm' onClick={() => setIsInquiryOpen(true)} className='gap-1.5'>
+              <FileText className='h-4 w-4' />Inquery
+            </Button>
             <Button size='sm' onClick={handleSave} className='gap-1.5 bg-blue-600 hover:bg-blue-700 text-white'>
               <Save className='h-4 w-4' />Simpan
             </Button>
@@ -223,32 +310,48 @@ export function VendorAnalytic() {
         </div>
 
         {/* Settings */}
-        <div className='mb-6 flex flex-wrap items-end gap-4 rounded-xl border bg-card p-4 shadow-sm'>
-          <div className='flex flex-col gap-1'>
-            <label className='text-xs font-medium text-muted-foreground'>Nama Project / RFS</label>
-            <Input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder='Input No. RFS' className='h-9 w-64 text-sm' />
-          </div>
-          <div className='flex flex-col gap-1'>
-            <label className='text-xs font-medium text-muted-foreground'>Kurs USD → IDR</label>
-            <Input value={usdRate} onChange={e => setUsdRate(e.target.value)} className='h-9 w-36 text-sm' placeholder='17500' />
-          </div>
-          <div className='flex flex-col gap-1'>
-            <label className='text-xs font-medium text-muted-foreground'>Jumlah Vendor</label>
-            <div className='flex gap-1'>
-              {[1, 2, 3].map(n => (
-                <button key={n} onClick={() => setVendorCount(n)}
-                  className={`h-9 w-9 rounded-md border text-sm font-semibold transition-colors ${vendorCount === n ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}>
-                  {n}
-                </button>
-              ))}
+        <div className='mb-6 flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm'>
+          <div className='flex flex-wrap items-end gap-4'>
+            <div className='flex flex-col gap-1'>
+              <label className='text-xs font-medium text-muted-foreground'>Nama Project / RFS</label>
+              <Input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder='Input No. RFS' className='h-9 w-64 text-sm' />
+            </div>
+            <div className='flex flex-col gap-1'>
+              <label className='text-xs font-medium text-muted-foreground'>Nama Mesin</label>
+              <Input value={machineName} onChange={e => setMachineName(e.target.value)} placeholder='Nama Mesin' className='h-9 w-44 text-sm' />
+            </div>
+            <div className='flex flex-col gap-1'>
+              <label className='text-xs font-medium text-muted-foreground'>Detail Mesin</label>
+              <Input value={machineDetail} onChange={e => setMachineDetail(e.target.value)} placeholder='Detail Mesin' className='h-9 w-44 text-sm' />
+            </div>
+            <div className='flex flex-col gap-1'>
+              <label className='text-xs font-medium text-muted-foreground'>Maker</label>
+              <Input value={machineMaker} onChange={e => setMachineMaker(e.target.value)} placeholder='Maker' className='h-9 w-44 text-sm' />
             </div>
           </div>
-          {Array.from({ length: vendorCount }, (_, i) => (
-            <div key={i} className='flex flex-col gap-1'>
-              <label className='text-xs font-medium text-muted-foreground'><VBadge idx={i} name={vendors[i].name} /></label>
-              <Input value={vendors[i].name} onChange={e => updVendor(i, e.target.value)} placeholder={`Nama vendor ${i + 1}`} className='h-9 w-44 text-sm' />
+          <div className='flex flex-wrap items-end gap-4'>
+            <div className='flex flex-col gap-1'>
+              <label className='text-xs font-medium text-muted-foreground'>Kurs USD → IDR</label>
+              <Input value={usdRate} onChange={e => setUsdRate(e.target.value)} className='h-9 w-36 text-sm' placeholder='17500' />
             </div>
-          ))}
+            <div className='flex flex-col gap-1'>
+              <label className='text-xs font-medium text-muted-foreground'>Jumlah Vendor</label>
+              <div className='flex gap-1'>
+                {[1, 2, 3].map(n => (
+                  <button key={n} onClick={() => setVendorCount(n)}
+                    className={`h-9 w-9 rounded-md border text-sm font-semibold transition-colors ${vendorCount === n ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {Array.from({ length: vendorCount }, (_, i) => (
+              <div key={i} className='flex flex-col gap-1'>
+                <label className='text-xs font-medium text-muted-foreground'><VBadge idx={i} name={vendors[i].name} /></label>
+                <Input value={vendors[i].name} onChange={e => updVendor(i, e.target.value)} placeholder={`Nama vendor ${i + 1}`} className='h-9 w-44 text-sm' />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Summary cards */}
@@ -267,10 +370,17 @@ export function VendorAnalytic() {
 
         {/* Table */}
         <div ref={tableRef} className='rounded-xl border bg-background shadow-sm'>
-          {projectName && (
+          {(projectName || machineName || machineDetail || machineMaker) && (
             <div className='border-b px-4 py-3'>
-              <p className='text-sm font-semibold'>{projectName}</p>
-              <p className='text-xs text-muted-foreground'>1 USD = Rp {parseNum(usdRate).toLocaleString('id-ID')}</p>
+              {projectName && <p className='text-sm font-semibold'>{projectName}</p>}
+              {(machineName || machineDetail || machineMaker) && (
+                <div className='mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground'>
+                  {machineName && <span>Nama Mesin: {machineName}</span>}
+                  {machineDetail && <span>Detail Mesin: {machineDetail}</span>}
+                  {machineMaker && <span>Maker: {machineMaker}</span>}
+                </div>
+              )}
+              <p className='mt-1 text-xs text-muted-foreground'>1 USD = Rp {parseNum(usdRate).toLocaleString('id-ID')}</p>
             </div>
           )}
           <div className='overflow-x-auto'>
@@ -278,9 +388,9 @@ export function VendorAnalytic() {
               <thead>
                 <tr className='border-b bg-muted/40 text-left'>
                   <th className='w-8 px-2 py-3 text-center text-xs'>No</th>
-                  <th className='w-28 px-2 py-3 text-xs'>P/N</th>
-                  <th className='min-w-52 px-2 py-3 text-xs'>Description</th>
-                  <th className='w-16 px-2 py-3 text-center text-xs'>QTY</th>
+                  <th className='w-64 px-2 py-3 text-xs'>P/N</th>
+                  <th className='min-w-[36rem] px-2 py-3 text-xs'>Description</th>
+                  <th className='w-20 px-2 py-3 text-center text-xs'>QTY</th>
                   <th className='w-20 px-2 py-3 text-center text-xs'>Unit</th>
                   {Array.from({ length: vendorCount }, (_, i) => (
                     <th key={i} colSpan={collapsed[i] ? 1 : 4} className={`px-3 py-3 ${VC[i].text}`}>
@@ -320,7 +430,7 @@ export function VendorAnalytic() {
                       <td className='px-2 py-2 text-center text-xs text-muted-foreground'>{rowIdx + 1}</td>
                       <td className='px-2 py-2'><Input value={item.pn} onChange={e => updateItem(item.id, 'pn', e.target.value)} placeholder='P/N' className='h-8 w-full text-xs' /></td>
                       <td className='px-2 py-2'><Input value={item.description} onChange={e => updateItem(item.id, 'description', e.target.value)} placeholder='Nama barang / deskripsi' className='h-8 w-full text-xs' /></td>
-                      <td className='px-2 py-2'><Input type='number' min={0} value={item.qty} onChange={e => updateItem(item.id, 'qty', e.target.value)} placeholder='0' className='h-8 w-full text-center text-xs' /></td>
+                      <td className='px-2 py-2'><Input type='number' min={0} value={item.qty} onChange={e => updateItem(item.id, 'qty', e.target.value)} placeholder='0' className='h-8 w-20 text-center text-xs' /></td>
                       <td className='px-2 py-2'><Input value={item.unit} onChange={e => updateItem(item.id, 'unit', e.target.value)} placeholder='PC' className='h-8 w-full text-center text-xs' /></td>
 
                       {Array.from({ length: vendorCount }, (_, vi) => {
@@ -466,7 +576,85 @@ export function VendorAnalytic() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isInquiryOpen} onOpenChange={setIsInquiryOpen}>
+        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-4xl'>
+          <DialogHeader>
+            <DialogTitle>Inquery</DialogTitle>
+            <DialogDescription>
+              Pratinjau permintaan penawaran untuk dikirim ke vendor.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='overflow-x-auto rounded-md border bg-white p-4'>
+            <div
+              ref={inquiryContentRef}
+              className='mx-auto w-[794px] bg-white p-6 font-sans text-sm text-black'
+            >
+              <p className='py-1'>Dear Sir/Madam,</p>
+              <p className='py-1'>
+                Kindly quote us for the item below :
+              </p>
+              <div className='mt-5'>
+                <div className='grid grid-cols-[105px_12px_1fr] py-1'>
+                  <span>Nama Mesin</span>
+                  <span>:</span>
+                  <span>{machineName}</span>
+                </div>
+                <div className='grid grid-cols-[105px_12px_1fr] py-1'>
+                  <span>Detail Mesin</span>
+                  <span>:</span>
+                  <span>{machineDetail}</span>
+                </div>
+                <div className='grid grid-cols-[105px_12px_1fr] py-1'>
+                  <span>Maker</span>
+                  <span>:</span>
+                  <span>{machineMaker}</span>
+                </div>
+              </div>
+              <table className='mt-6 w-full table-fixed border-collapse text-left'>
+                <colgroup>
+                  <col className='w-[8%]' />
+                  <col className='w-[18%]' />
+                  <col className='w-[28%]' />
+                  <col className='w-[12%]' />
+                  <col className='w-[14%]' />
+                  <col className='w-[20%]' />
+                </colgroup>
+                <thead>
+                  <tr>
+                    {['No.', 'P/N', 'Description', 'Qty', 'Unit', 'Price'].map((heading) => (
+                      <th key={heading} className='border border-gray-300 px-2 py-2 font-normal'>
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => (
+                    <tr key={item.id}>
+                      <td className='h-8 border border-gray-300 px-2 py-1'>{index + 1}</td>
+                      <td className='border border-gray-300 px-2 py-1'>{item.pn}</td>
+                      <td className='border border-gray-300 px-2 py-1'>{item.description}</td>
+                      <td className='border border-gray-300 px-2 py-1'>{item.qty}</td>
+                      <td className='border border-gray-300 px-2 py-1'>{item.unit}</td>
+                      <td className='border border-gray-300 px-2 py-1' />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setIsInquiryOpen(false)}>
+              Tutup
+            </Button>
+            <Button onClick={() => void handleInquiryPdf()} className='gap-1.5'>
+              <Download className='h-4 w-4' />
+              Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
-
