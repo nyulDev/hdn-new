@@ -117,106 +117,132 @@ export function InvoicePage() {
   >({})
   const [saving, setSaving] = useState(false)
   const [paymentTerm, setPaymentTerm] = useState('')
-  const [pdfPageCount, setPdfPageCount] = useState(1)
   const invoiceContentRef = useRef<HTMLDivElement>(null)
 
   const handleDownloadPdf = async () => {
     if (!invoiceContentRef.current) return
     try {
-      const clone = invoiceContentRef.current.cloneNode(true) as HTMLElement
-      clone.style.cssText =
-        'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;border:none;outline:none;box-shadow:none;'
-      // Remove any yellow outline/border from all child elements
-      clone.querySelectorAll<HTMLElement>('*').forEach((el) => {
-        el.style.outline = 'none'
-        el.style.boxShadow = 'none'
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait',
       })
-      clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach((el) => {
-        el.style.display = 'none'
-      })
-      // Show pdf-show spans (qty value, tanggal, location plain text)
-      clone.querySelectorAll<HTMLElement>('.pdf-show').forEach((el) => {
-        el.style.display = 'inline'
-        el.style.border = 'none'
-        el.style.outline = 'none'
-        el.style.boxShadow = 'none'
-        el.style.background = 'transparent'
-        el.style.padding = '0'
-      })
-
-      const invoiceTable = clone.querySelector('table')
-      if (invoiceTable) {
-        invoiceTable
-          .querySelectorAll<HTMLElement>('tr > [data-pdf-hide]')
-          .forEach((cell) => cell.remove())
-        invoiceTable.style.width = '100%'
-        invoiceTable.style.maxWidth = '100%'
-        invoiceTable.style.tableLayout = 'fixed'
-        invoiceTable.style.fontSize = '12px'
-
-        const columnWidths = ['5%', '19%', '26%', '9%', '8%', '17%', '16%']
-        const columnGroup = document.createElement('colgroup')
-        columnWidths.forEach((width) => {
-          const column = document.createElement('col')
-          column.style.width = width
-          columnGroup.appendChild(column)
-        })
-        invoiceTable.insertBefore(columnGroup, invoiceTable.firstChild)
-
-        invoiceTable
-          .querySelectorAll<HTMLElement>('th, td')
-          .forEach((cell) => {
-            cell.style.minWidth = '0'
-            cell.style.padding = '4px 3px'
-            cell.style.whiteSpace = 'normal'
-            cell.style.overflowWrap = 'anywhere'
-          })
-      }
-      document.body.appendChild(clone)
-
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: clone.scrollWidth,
-        height: clone.scrollHeight,
-        windowWidth: clone.scrollWidth,
-        windowHeight: clone.scrollHeight,
-      })
-      document.body.removeChild(clone)
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.98)
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
       const margin = 8
       const contentWidth = pageWidth - margin * 2
-      const imgHeightMm = (canvas.height * contentWidth) / canvas.width
-      // Calculate actual page count from canvas dimensions
       const pageContentHeight = pageHeight - margin * 2
-      const totalPages = Math.max(1, Math.ceil(imgHeightMm / pageContentHeight))
-      void totalPages // page count calculated but displayed via estimatedPageCount
 
-      if (imgHeightMm <= pageContentHeight) {
-        pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, imgHeightMm)
-      } else {
-        const pageHeightPx = Math.floor((pageContentHeight / contentWidth) * canvas.width)
-        let yPx = 0
-        while (yPx < canvas.height) {
-          if (yPx > 0) pdf.addPage()
-          const sliceCanvas = document.createElement('canvas')
-          sliceCanvas.width = canvas.width
-          sliceCanvas.height = Math.min(pageHeightPx, canvas.height - yPx)
-          const ctx = sliceCanvas.getContext('2d')!
-          ctx.drawImage(canvas, 0, yPx, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height)
-          const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98)
-          const sliceHeightMm = (sliceCanvas.height * contentWidth) / canvas.width
-          pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceHeightMm)
-          yPx += pageHeightPx
+      for (let pageIndex = 0; pageIndex < estimatedPageCount; pageIndex += 1) {
+        const clone = invoiceContentRef.current.cloneNode(true) as HTMLElement
+        clone.style.cssText =
+          'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;border:none;outline:none;box-shadow:none;'
+
+        clone.querySelectorAll<HTMLElement>('*').forEach((el) => {
+          el.style.outline = 'none'
+          el.style.boxShadow = 'none'
+        })
+        clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach((el) => {
+          el.style.display = 'none'
+        })
+        clone.querySelectorAll<HTMLElement>('.pdf-show').forEach((el) => {
+          el.style.display = 'inline'
+          el.style.border = 'none'
+          el.style.outline = 'none'
+          el.style.boxShadow = 'none'
+          el.style.background = 'transparent'
+          el.style.padding = '0'
+        })
+
+        const invoiceTable = clone.querySelector('table')
+        if (invoiceTable) {
+          invoiceTable
+            .querySelectorAll<HTMLElement>('tr > [data-pdf-hide]')
+            .forEach((cell) => cell.remove())
+          invoiceTable.style.width = '100%'
+          invoiceTable.style.maxWidth = '100%'
+          invoiceTable.style.tableLayout = 'fixed'
+          invoiceTable.style.fontSize = '12px'
+
+          const columnWidths = ['5%', '19%', '26%', '9%', '8%', '17%', '16%']
+          const columnGroup = document.createElement('colgroup')
+          columnWidths.forEach((width) => {
+            const column = document.createElement('col')
+            column.style.width = width
+            columnGroup.appendChild(column)
+          })
+          invoiceTable.insertBefore(columnGroup, invoiceTable.firstChild)
+
+          invoiceTable
+            .querySelectorAll<HTMLElement>('th, td')
+            .forEach((cell) => {
+              cell.style.minWidth = '0'
+              cell.style.padding = '4px 3px'
+              cell.style.whiteSpace = 'normal'
+              cell.style.overflowWrap = 'anywhere'
+            })
         }
+
+        if (pageIndex > 0) {
+          clone.querySelector<HTMLElement>('[data-pdf-letterhead]')?.remove()
+          clone
+            .querySelectorAll<HTMLElement>('[data-pdf-first-page]')
+            .forEach((el) => el.remove())
+        }
+
+        const itemRows = Array.from(clone.querySelectorAll('tbody tr'))
+        const firstRowIndex = pageIndex * 10
+        itemRows.forEach((row, rowIndex) => {
+          if (rowIndex < firstRowIndex || rowIndex >= firstRowIndex + 10) {
+            row.remove()
+          }
+        })
+
+        if (pageIndex < estimatedPageCount - 1) {
+          clone
+            .querySelectorAll<HTMLElement>('[data-pdf-last-page]')
+            .forEach((el) => {
+              el.remove()
+            })
+        }
+
+        document.body.appendChild(clone)
+        let canvas: HTMLCanvasElement
+        try {
+          canvas = await html2canvas(clone, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            width: clone.scrollWidth,
+            height: clone.scrollHeight,
+            windowWidth: clone.scrollWidth,
+            windowHeight: clone.scrollHeight,
+          })
+        } finally {
+          document.body.removeChild(clone)
+        }
+
+        if (pageIndex > 0) pdf.addPage()
+        const scale = Math.min(
+          contentWidth / canvas.width,
+          pageContentHeight / canvas.height
+        )
+        const imageWidth = canvas.width * scale
+        const imageHeight = canvas.height * scale
+        const imgData = canvas.toDataURL('image/jpeg', 0.98)
+        pdf.addImage(
+          imgData,
+          'JPEG',
+          (pageWidth - imageWidth) / 2,
+          margin,
+          imageWidth,
+          imageHeight
+        )
       }
 
-      const noQuo = String(loadedInvoice?.formInfo?.noQuo ?? loadedInvoice?.noQuo ?? '').trim()
+      const noQuo = String(
+        loadedInvoice?.formInfo?.noQuo ?? loadedInvoice?.noQuo ?? ''
+      ).trim()
       pdf.save(noQuo ? `Invoice-${noQuo}.pdf` : 'Invoice.pdf')
     } catch (err) {
       console.error('Download PDF error:', err)
@@ -246,47 +272,6 @@ export function InvoicePage() {
       .then(setInvoices)
       .catch(() => setInvoices([]))
   }, [])
-
-  useEffect(() => {
-    if (!invoiceContentRef.current) return
-    let timeoutId: ReturnType<typeof setTimeout>
-    const calculatePageCount = () => {
-      const el = invoiceContentRef.current
-      if (!el) return
-      
-      const clone = el.cloneNode(true) as HTMLElement
-      clone.style.cssText =
-        'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;border:none;outline:none;box-shadow:none;visibility:hidden;'
-      
-      clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach((node) => {
-        node.style.display = 'none'
-      })
-      clone.querySelectorAll<HTMLElement>('.pdf-show').forEach((node) => {
-        node.style.display = 'inline'
-        node.style.border = 'none'
-        node.style.outline = 'none'
-        node.style.boxShadow = 'none'
-        node.style.background = 'transparent'
-        node.style.padding = '0'
-      })
-
-      document.body.appendChild(clone)
-      
-      const contentWidthMm = 194
-      const contentHeightMm = 281
-      const scrollHeight = clone.scrollHeight
-      const scrollWidth = clone.scrollWidth || 794
-      const imgHeightMm = (scrollHeight * contentWidthMm) / scrollWidth
-      const pages = Math.max(1, Math.ceil(imgHeightMm / contentHeightMm))
-      
-      setPdfPageCount(pages)
-      document.body.removeChild(clone)
-    }
-
-    timeoutId = setTimeout(calculatePageCount, 300)
-    return () => clearTimeout(timeoutId)
-  }, [loadedInvoice, showOriginalQuotation, selectedQuantities, selectedSavedInvoiceId, location, invoiceDate, noPo])
-
 
   const activeQuotationNumbers = new Set(
     quotationList.map((quotation) => quotation.noQuo)
@@ -476,7 +461,7 @@ export function InvoicePage() {
   const previewDpp = (11 / 12) * previewTotalAfterDiscount
   const previewPpn = previewDpp * (ppnPct / 100)
   const previewTotalInvoice = previewTotalAfterDiscount + previewPpn
-  const estimatedPageCount = pdfPageCount
+  const estimatedPageCount = Math.max(1, Math.ceil(previewRows.length / 10))
   const invoiceNo = loadedInvoice
     ? (() => {
         const noQuo = (loadedInvoice.formInfo?.noQuo || 'XXX').replace(
@@ -732,7 +717,10 @@ export function InvoicePage() {
               </Button>
             </div>
           </div>
-          <div className='mb-6 flex items-start justify-between gap-4'>
+          <div
+            className='mb-6 flex items-start justify-between gap-4'
+            data-pdf-letterhead
+          >
             <div>
               <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
                 <span className='text-[#21ae43] text-4xl md:text-5xl'>H</span>
@@ -756,13 +744,19 @@ export function InvoicePage() {
             />
           </div>
 
-          <div className='flex flex-col items-center justify-center border-b border-slate-300 pb-3'>
+          <div
+            className='flex flex-col items-center justify-center border-b border-slate-300 pb-3'
+            data-pdf-first-page
+          >
             <h3 className='text-5xl font-black tracking-wide text-red-600 uppercase'>
               {showOriginalQuotation ? 'QUOTATION' : 'INVOICE'}
             </h3>
           </div>
 
-          <div className='relative mt-6 grid items-start gap-4 md:grid-cols-[1.4fr_0.9fr] print:relative'>
+          <div
+            className='relative mt-6 grid items-start gap-4 md:grid-cols-[1.4fr_0.9fr] print:relative'
+            data-pdf-first-page
+          >
             <div className='space-y-2 text-sm'>
               <p>
                 <span className='font-semibold'>
@@ -963,7 +957,7 @@ export function InvoicePage() {
             </table>
           </div>
 
-          <div className='mt-6 flex justify-end'>
+          <div className='mt-6 flex justify-end' data-pdf-last-page>
             <div className='w-full max-w-md space-y-2 text-sm'>
               <div className='flex justify-between'>
                 <span>Sub Total :</span>
@@ -1022,7 +1016,7 @@ export function InvoicePage() {
             </div>
           </div>
 
-          <div className='mt-10 border-t border-slate-300 pt-6'>
+          <div className='mt-10 border-t border-slate-300 pt-6' data-pdf-last-page>
             <div className='flex items-start justify-between gap-8 text-sm'>
               <div>
                 <p className='font-semibold uppercase'>REMIT TO:</p>
