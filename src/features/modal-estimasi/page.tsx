@@ -331,32 +331,59 @@ export function ModalEstimasi({
     'inquery' | 'opsi' | null
   >(null)
   const inquiryContentRef = useRef<HTMLDivElement>(null)
+  const quotationReportContentRef = useRef<HTMLDivElement>(null)
 
-  const handleDownloadInquiryPdf = async () => {
-    if (!inquiryContentRef.current) {
+  const handleDownloadQuotationPdf = async (
+    content: HTMLDivElement | null,
+    filenamePrefix: string
+  ) => {
+    if (!content) {
       alert('Konten tidak ditemukan')
       return
     }
 
     try {
-      const clone = inquiryContentRef.current.cloneNode(true) as HTMLElement
+      const clone = content.cloneNode(true) as HTMLElement
       clone.style.cssText =
         'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;'
       document.body.appendChild(clone)
 
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: clone.scrollWidth,
-        height: clone.scrollHeight,
-        windowWidth: clone.scrollWidth,
-        windowHeight: clone.scrollHeight,
-      })
+      let canvas: HTMLCanvasElement
+      let pageBreaks: number[]
+      let cloneWidth: number
+      let pageLabelPosition: { x: number; y: number } | undefined
+      try {
+        const cloneRect = clone.getBoundingClientRect()
+        cloneWidth = cloneRect.width
+        const pageLabel = clone.querySelector('[data-pdf-page-number]')
+        if (pageLabel) {
+          const labelRect = pageLabel.getBoundingClientRect()
+          pageLabelPosition = {
+            x: labelRect.left - cloneRect.left,
+            y: labelRect.top - cloneRect.top,
+          }
+        }
+        pageBreaks = [
+          ...Array.from(clone.children, (element) =>
+            element.getBoundingClientRect().bottom - cloneRect.top
+          ),
+          ...Array.from(clone.querySelectorAll('tr'), (row) =>
+            row.getBoundingClientRect().bottom - cloneRect.top
+          ),
+        ]
+        canvas = await html2canvas(clone, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          width: clone.scrollWidth,
+          height: clone.scrollHeight,
+          windowWidth: clone.scrollWidth,
+          windowHeight: clone.scrollHeight,
+        })
+      } finally {
+        document.body.removeChild(clone)
+      }
 
-      document.body.removeChild(clone)
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.98)
       const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
 
       const pageWidth = pdf.internal.pageSize.getWidth()
@@ -365,27 +392,66 @@ export function ModalEstimasi({
       const contentWidth = pageWidth - margin * 2
       const imgHeightMm = (canvas.height * contentWidth) / canvas.width
       const pageContentHeight = pageHeight - margin * 2
+      const pageSlices: { start: number; end: number }[] = []
 
       if (imgHeightMm <= pageContentHeight) {
-        pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, imgHeightMm)
+        pageSlices.push({ start: 0, end: canvas.height })
       } else {
         const pageHeightPx = Math.floor((pageContentHeight / contentWidth) * canvas.width)
+        const scale = canvas.width / cloneWidth
+        const pageBreaksPx = pageBreaks
+          .map((breakpoint) => Math.round(breakpoint * scale))
+          .sort((first, second) => first - second)
         let yPx = 0
         while (yPx < canvas.height) {
-          if (yPx > 0) pdf.addPage()
-          const sliceCanvas = document.createElement('canvas')
-          sliceCanvas.width = canvas.width
-          sliceCanvas.height = Math.min(pageHeightPx, canvas.height - yPx)
-          const ctx = sliceCanvas.getContext('2d')!
-          ctx.drawImage(canvas, 0, yPx, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height)
-          const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98)
-          const sliceHeightMm = (sliceCanvas.height * contentWidth) / canvas.width
-          pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceHeightMm)
-          yPx += pageHeightPx
+          const targetYPx = Math.min(yPx + pageHeightPx, canvas.height)
+          const safeBreaks = pageBreaksPx.filter(
+            (breakpoint) => breakpoint > yPx && breakpoint <= targetYPx
+          )
+          const endYPx =
+            targetYPx === canvas.height
+              ? canvas.height
+              : safeBreaks.length > 0
+                ? safeBreaks[safeBreaks.length - 1]
+                : targetYPx
+          pageSlices.push({ start: yPx, end: endYPx })
+          yPx = endYPx
         }
       }
 
-      const filenamePrefix = inquiryDialogMode === 'opsi' ? 'Opsi' : 'Inquery'
+      pageSlices.forEach(({ start, end }, pageIndex) => {
+        if (pageIndex > 0) pdf.addPage()
+        const sliceCanvas = document.createElement('canvas')
+        sliceCanvas.width = canvas.width
+        sliceCanvas.height = end - start
+        const ctx = sliceCanvas.getContext('2d')!
+        ctx.drawImage(
+          canvas,
+          0,
+          start,
+          canvas.width,
+          sliceCanvas.height,
+          0,
+          0,
+          canvas.width,
+          sliceCanvas.height
+        )
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98)
+        const sliceHeightMm = (sliceCanvas.height * contentWidth) / canvas.width
+        pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceHeightMm)
+      })
+
+      if (pageLabelPosition) {
+        const labelX = margin + (pageLabelPosition.x / cloneWidth) * contentWidth
+        const labelY = margin + (pageLabelPosition.y / cloneWidth) * contentWidth
+        pdf.setPage(1)
+        pdf.setFillColor(255, 255, 255)
+        pdf.rect(labelX, labelY, 32, 4, 'F')
+        pdf.setFontSize(8)
+        pdf.setTextColor(15, 23, 42)
+        pdf.text(`: ${pageSlices.length}`, labelX, labelY + 3)
+      }
+
       const filename = formInfo.noQuo
         ? `${filenamePrefix}-${formInfo.noQuo}.pdf`
         : `${filenamePrefix}.pdf`
@@ -2918,21 +2984,23 @@ export function ModalEstimasi({
             </DialogHeader>
           )}
           {quotationMode ? (
-            <QuotationReport
-              formInfo={formInfo}
-              items={items}
-              quotationRange={quotationRange}
-              quotationDetails={quotationDetails}
-              quotationSubtotal={quotationSubtotal}
-              quotationDiscount={quotationDiscount}
-              quotationAfterDiscount={quotationAfterDiscount}
-              quotationDpp={quotationDpp}
-              quotationPpn={quotationPpn}
-              quotationTotal={effectiveQuotationTotal}
-              quotationPpnPct={quotationPpnPct}
-              quotationDiscountPct={quotationDiscountPct}
-              customers={customers}
-            />
+            <div ref={quotationReportContentRef}>
+              <QuotationReport
+                formInfo={formInfo}
+                items={items}
+                quotationRange={quotationRange}
+                quotationDetails={quotationDetails}
+                quotationSubtotal={quotationSubtotal}
+                quotationDiscount={quotationDiscount}
+                quotationAfterDiscount={quotationAfterDiscount}
+                quotationDpp={quotationDpp}
+                quotationPpn={quotationPpn}
+                quotationTotal={effectiveQuotationTotal}
+                quotationPpnPct={quotationPpnPct}
+                quotationDiscountPct={quotationDiscountPct}
+                customers={customers}
+              />
+            </div>
           ) : (
             <EstimasiReport
               formInfo={formInfo}
@@ -2963,9 +3031,23 @@ export function ModalEstimasi({
             >
               Tutup
             </Button>
-            <Button onClick={() => window.print()} className='gap-1.5'>
-              <Printer className='h-3.5 w-3.5' />
-              Print Report
+            <Button
+              onClick={() =>
+                quotationMode
+                  ? void handleDownloadQuotationPdf(
+                      quotationReportContentRef.current,
+                      'Quotation'
+                    )
+                  : window.print()
+              }
+              className='gap-1.5'
+            >
+              {quotationMode ? (
+                <Download className='h-3.5 w-3.5' />
+              ) : (
+                <Printer className='h-3.5 w-3.5' />
+              )}
+              {quotationMode ? 'Download PDF' : 'Print Report'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3008,7 +3090,15 @@ export function ModalEstimasi({
             >
               Tutup
             </Button>
-            <Button onClick={() => void handleDownloadInquiryPdf()} className='gap-1.5'>
+            <Button
+              onClick={() =>
+                void handleDownloadQuotationPdf(
+                  inquiryContentRef.current,
+                  inquiryDialogMode === 'opsi' ? 'Opsi' : 'Inquery'
+                )
+              }
+              className='gap-1.5'
+            >
               <Download className='h-3.5 w-3.5' />
               Download PDF
             </Button>
@@ -3468,7 +3558,7 @@ function QuotationReport({
           {!inquiryMode && (
             <>
               <span className='font-bold'>PAGE</span>
-              <span>: 1</span>
+              <span data-pdf-page-number>: 1</span>
               <span className='font-bold'>SUBJECT</span>
               <span>: {formInfo.subject || '-'}</span>
               <span className='font-bold'>SUPPLY LOCATION</span>

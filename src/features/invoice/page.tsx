@@ -120,7 +120,8 @@ export function InvoicePage() {
   const invoiceContentRef = useRef<HTMLDivElement>(null)
 
   const handleDownloadPdf = async () => {
-    if (!invoiceContentRef.current) return
+    const invoiceContent = invoiceContentRef.current
+    if (!invoiceContent) return
     try {
       const pdf = new jsPDF({
         unit: 'mm',
@@ -133,8 +134,8 @@ export function InvoicePage() {
       const contentWidth = pageWidth - margin * 2
       const pageContentHeight = pageHeight - margin * 2
 
-      for (let pageIndex = 0; pageIndex < estimatedPageCount; pageIndex += 1) {
-        const clone = invoiceContentRef.current.cloneNode(true) as HTMLElement
+      const createPageClone = (pageIndex: number) => {
+        const clone = invoiceContent.cloneNode(true) as HTMLElement
         clone.style.cssText =
           'position:fixed;top:0;left:0;width:794px;z-index:-9999;background:#ffffff;padding:16px;border:none;outline:none;box-shadow:none;'
 
@@ -153,6 +154,16 @@ export function InvoicePage() {
           el.style.background = 'transparent'
           el.style.padding = '0'
         })
+        const invoiceNumber = clone.querySelector<HTMLElement>(
+          '[data-pdf-invoice-number]'
+        )
+        if (invoiceNumber) {
+          invoiceNumber.style.whiteSpace = 'nowrap'
+          const detailsGrid = invoiceNumber.parentElement
+          if (detailsGrid) detailsGrid.style.gridTemplateColumns = '90px 1fr'
+          const detailsPanel = detailsGrid?.parentElement
+          if (detailsPanel) detailsPanel.style.width = '340px'
+        }
 
         const invoiceTable = clone.querySelector('table')
         if (invoiceTable) {
@@ -188,23 +199,86 @@ export function InvoicePage() {
           clone
             .querySelectorAll<HTMLElement>('[data-pdf-first-page]')
             .forEach((el) => el.remove())
+          clone.querySelector('table thead')?.remove()
         }
 
-        const itemRows = Array.from(clone.querySelectorAll('tbody tr'))
-        const firstRowIndex = pageIndex * 10
-        itemRows.forEach((row, rowIndex) => {
-          if (rowIndex < firstRowIndex || rowIndex >= firstRowIndex + 10) {
-            row.remove()
-          }
-        })
+        return clone
+      }
 
-        if (pageIndex < estimatedPageCount - 1) {
+      const pageGroups: { start: number; end: number; includeSummary: boolean }[] = []
+      let startRow = 0
+      let pageIndex = 0
+      let summaryOnSeparatePage = false
+
+      while (startRow < previewRows.length || pageGroups.length === 0 || summaryOnSeparatePage) {
+        const clone = createPageClone(pageIndex)
+        const rows = Array.from(clone.querySelectorAll('tbody tr'))
+        const tbody = clone.querySelector('tbody')
+        rows.forEach((row) => row.remove())
+        const summaryElements = Array.from(
+          clone.querySelectorAll<HTMLElement>('[data-pdf-last-page]')
+        )
+        summaryElements.forEach((element) => {
+          element.style.display = 'none'
+        })
+        document.body.appendChild(clone)
+
+        const maxContentHeight = pageContentHeight * (clone.scrollWidth / contentWidth)
+        const start = startRow
+        while (tbody && startRow < rows.length) {
+          tbody.appendChild(rows[startRow])
+          if (clone.scrollHeight > maxContentHeight && startRow > start) {
+            rows[startRow].remove()
+            break
+          }
+          startRow += 1
+          if (clone.scrollHeight > maxContentHeight) break
+        }
+
+        const consumedAllRows = startRow >= rows.length
+        let includeSummary = false
+        if (consumedAllRows) {
+          summaryElements.forEach((element) => {
+            element.style.display = ''
+          })
+          includeSummary =
+            clone.scrollHeight <= maxContentHeight || start >= rows.length
+          if (!includeSummary) {
+            summaryElements.forEach((element) => {
+              element.style.display = 'none'
+            })
+            summaryOnSeparatePage = true
+          } else {
+            summaryOnSeparatePage = false
+          }
+        }
+
+        if (startRow === start && !consumedAllRows) {
+          startRow += 1
+        }
+        pageGroups.push({ start, end: startRow, includeSummary })
+        document.body.removeChild(clone)
+        pageIndex += 1
+        if (consumedAllRows && !summaryOnSeparatePage) break
+        if (consumedAllRows && summaryOnSeparatePage) {
+          startRow = rows.length
+        }
+      }
+
+      for (const [pageIndex, group] of pageGroups.entries()) {
+        const clone = createPageClone(pageIndex)
+        const rows = Array.from(clone.querySelectorAll('tbody tr'))
+        rows.forEach((row, rowIndex) => {
+          if (rowIndex < group.start || rowIndex >= group.end) row.remove()
+        })
+        if (!group.includeSummary) {
           clone
             .querySelectorAll<HTMLElement>('[data-pdf-last-page]')
-            .forEach((el) => {
-              el.remove()
-            })
+            .forEach((element) => element.remove())
         }
+        clone.querySelector('[data-pdf-page-count]')?.replaceChildren(
+          document.createTextNode(`: ${pageGroups.length}`)
+        )
 
         document.body.appendChild(clone)
         let canvas: HTMLCanvasElement
@@ -768,7 +842,7 @@ export function InvoicePage() {
             <div className='space-y-2 text-sm print:absolute print:top-0 print:right-0 print:w-[260px]'>
               <div className='grid grid-cols-[120px_1fr] gap-2'>
                 <span className='font-semibold'>NO</span>
-                <span>: {invoiceNo}</span>
+                <span data-pdf-invoice-number>: {invoiceNo}</span>
                 <span className='font-semibold'>NO. PO</span>
                 <span className='flex items-center gap-1'>
                   :{' '}
@@ -821,7 +895,7 @@ export function InvoicePage() {
                   </span>
                 </span>
                 <span className='font-semibold'>PAGE</span>
-                <span>: {estimatedPageCount}</span>
+                <span data-pdf-page-count>: {estimatedPageCount}</span>
                 <span className='font-semibold'>LOCATION</span>
                 <span>
                   :{' '}
