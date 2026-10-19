@@ -477,17 +477,10 @@ export function InvoicePage() {
   const customer = customers.find(
     (item) => item.pt === loadedInvoice?.formInfo?.pt
   )
-  const savedInvoiceForReference = invoices
-    .filter(
-      (invoice) =>
-        invoice.formInfo?.noRfs &&
-        invoice.formInfo.noRfs === loadedInvoice?.formInfo?.noRfs
-    )
-    .sort((first, second) =>
-      String(second.updatedAt).localeCompare(String(first.updatedAt))
-    )[0]
   const savedTotalAfterDiscount =
-    savedInvoiceForReference?.formInfo?.invoiceTotalAfterDiscount
+    selectedSavedInvoiceId !== null
+      ? loadedInvoice?.formInfo?.invoiceTotalAfterDiscount
+      : undefined
   const invoicePreviewTotalAfterDiscount =
     savedTotalAfterDiscount !== undefined &&
     savedTotalAfterDiscount !== null &&
