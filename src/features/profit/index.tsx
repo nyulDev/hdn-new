@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { jsPDF } from 'jspdf'
+import { Download } from 'lucide-react'
 import {
   getEstimasiByNoQuo,
   getEstimasiList,
@@ -11,6 +13,7 @@ import {
   getQuotationAfterDiscount,
   parseQuotationNumber,
 } from '@/lib/profit'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Header } from '@/components/layout/header'
@@ -116,16 +119,196 @@ export function Profit() {
 
   const grossActual = values.invoiceActual - values.modalActual
   const grossEstimate = values.invoiceEstimate - values.modalEstimate
-  const investorShareActual = grossActual * 0.1
   const hsiEstimate = values.investorEstimate
   const paymentShares = [0.3, 0.2, 0.1, 0.03, 0]
   const appliedBansosActual = useBansos ? values.bansosActual : 0
   const appliedBansosEstimate = useBansos ? values.bansosEstimate : 0
-  const netActual = grossActual - appliedBansosActual - investorShareActual
+  const marketingTotal = Math.max(grossActual, 0)
+  const marketingShareActual = marketingTotal * paymentShares[2]
+  const netActual =
+    grossActual -
+    appliedBansosActual -
+    values.investorActual -
+    marketingShareActual
   const marketingShareEstimate = grossEstimate * paymentShares[2]
   const netEstimate =
     grossEstimate - appliedBansosEstimate - hsiEstimate - marketingShareEstimate
-  const marketingTotal = Math.max(grossActual, 0)
+
+  const handleDownloadPdf = () => {
+    try {
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'landscape',
+      })
+      const margin = 12
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const tableWidth = pageWidth - margin * 2
+      const columnWidths = [
+        tableWidth * 0.38,
+        tableWidth * 0.22,
+        tableWidth * 0.1,
+        tableWidth * 0.22,
+        tableWidth * 0.08,
+      ]
+      const headers = ['Keterangan', 'AKTUAL', '%', 'ESTIMASI PPN', '%']
+      const rows = [
+        [
+          '1. INVOICE',
+          formatAmount(values.invoiceActual),
+          '-',
+          formatAmount(values.invoiceEstimate),
+          '-',
+        ],
+        [
+          '2. MODAL',
+          formatAmount(values.modalActual),
+          '-',
+          formatAmount(values.modalEstimate),
+          '-',
+        ],
+        [
+          '3. GROSS PROFIT',
+          formatAmount(grossActual),
+          formatPercent(
+            values.invoiceActual
+              ? (grossActual / values.invoiceActual) * 100
+              : 0
+          ),
+          formatAmount(grossEstimate),
+          formatPercent(
+            values.invoiceEstimate
+              ? (grossEstimate / values.invoiceEstimate) * 100
+              : 0
+          ),
+        ],
+        [
+          'a. BANSOS',
+          formatAmount(appliedBansosActual),
+          `${useBansos ? bansosActualPct : '0'}%`,
+          formatAmount(appliedBansosEstimate),
+          `${useBansos ? bansosEstimatePct : '0'}%`,
+        ],
+        [
+          'i. HSI - 2 bulan',
+          formatAmount(values.investorActual),
+          '-',
+          formatAmount(hsiEstimate),
+          '-',
+        ],
+        [
+          `c. ${department ? `${department} ` : ''}NET PROFIT`,
+          formatAmount(netActual),
+          formatPercent(grossActual ? (netActual / grossActual) * 100 : 0),
+          formatAmount(netEstimate),
+          formatPercent(
+            values.modalEstimate
+              ? (netEstimate / values.modalEstimate) * 100
+              : 0
+          ),
+        ],
+      ]
+
+      pdf.setFontSize(16)
+      pdf.text('Laporan Profit', margin, 16)
+      pdf.setFontSize(10)
+      pdf.text(`No. Quo: ${noQuo.trim() || '-'}`, margin, 22)
+      pdf.text(
+        `Dicetak: ${new Date().toLocaleDateString('id-ID')}`,
+        pageWidth - margin,
+        22,
+        { align: 'right' }
+      )
+
+      let y = 30
+      const rowHeight = 8
+      const drawRow = (cells: string[], isHeader = false) => {
+        if (isHeader) {
+          pdf.setFillColor(235, 239, 245)
+          pdf.rect(margin, y, tableWidth, rowHeight, 'F')
+          pdf.setFont('helvetica', 'bold')
+        } else {
+          pdf.setFont('helvetica', 'normal')
+        }
+        pdf.setDrawColor(180, 185, 195)
+        pdf.rect(margin, y, tableWidth, rowHeight)
+
+        let x = margin
+        cells.forEach((cell, index) => {
+          const alignRight = index > 0
+          pdf.text(
+            cell,
+            alignRight ? x + columnWidths[index] - 2 : x + 2,
+            y + 5.3,
+            { align: alignRight ? 'right' : 'left' }
+          )
+          x += columnWidths[index]
+          if (index < cells.length - 1) {
+            pdf.line(x, y, x, y + rowHeight)
+          }
+        })
+        y += rowHeight
+      }
+
+      drawRow(headers, true)
+      rows.forEach((row) => drawRow(row))
+
+      y += 10
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(11)
+      pdf.text('SHARING Marketing Fee', margin, y)
+      y += 6
+      pdf.setFontSize(9)
+      const paymentLabels = [
+        'Cash',
+        '0-30 days',
+        '31-60 days',
+        '61-90 days',
+        '> 90 days',
+      ]
+      const shareCellWidth = tableWidth / (paymentLabels.length + 1)
+      const shareRows = [
+        ['Pembayaran', ...paymentLabels],
+        [
+          'Persentase',
+          ...paymentShares.map((share) => formatPercent(share * 100)),
+        ],
+        [
+          'Nilai Aktual',
+          ...paymentShares.map((share) => formatAmount(marketingTotal * share)),
+        ],
+      ]
+      shareRows.forEach((row, rowIndex) => {
+        let x = margin
+        row.forEach((cell, index) => {
+          if (index === 3) {
+            pdf.setFillColor(253, 224, 71)
+            pdf.rect(x, y, shareCellWidth, rowHeight, 'F')
+          }
+          pdf.setFont(
+            'helvetica',
+            rowIndex === 0 || (rowIndex === 2 && index === 3)
+              ? 'bold'
+              : 'normal'
+          )
+          pdf.setTextColor(rowIndex === 2 && index === 3 ? 220 : 0, 0, 0)
+          pdf.rect(x, y, shareCellWidth, rowHeight)
+          pdf.text(cell, x + shareCellWidth / 2, y + 5.3, { align: 'center' })
+          pdf.setTextColor(0, 0, 0)
+          x += shareCellWidth
+        })
+        y += rowHeight
+      })
+
+      const fileSuffix = noQuo.trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+      pdf.save(`Profit${fileSuffix ? `-${fileSuffix}` : ''}.pdf`)
+    } catch (error) {
+      console.error('Download PDF error:', error)
+      alert(
+        `Gagal membuat PDF: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  }
 
   return (
     <>
@@ -174,6 +357,15 @@ export function Profit() {
                 <option key={estimasi.id} value={estimasi.noQuo} />
               ))}
           </datalist>
+          <Button
+            type='button'
+            variant='outline'
+            className='h-8'
+            onClick={handleDownloadPdf}
+          >
+            <Download className='h-4 w-4' />
+            Download PDF
+          </Button>
         </div>
         <div className='overflow-x-auto rounded-md border bg-background shadow-sm'>
           <table className='w-full min-w-[780px] border-collapse font-mono text-sm'>

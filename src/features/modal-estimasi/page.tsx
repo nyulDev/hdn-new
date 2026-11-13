@@ -7,6 +7,8 @@ import {
   useCallback,
   useEffect,
 } from 'react'
+import html2canvas from 'html2canvas-pro'
+import { jsPDF } from 'jspdf'
 import {
   Plus,
   Trash2,
@@ -30,6 +32,7 @@ import {
 } from '@/lib/api/estimasi'
 import { getNetProfitEstimatePct } from '@/lib/profit'
 import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
@@ -41,17 +44,14 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import { Calendar } from '@/components/ui/calendar'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas-pro'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -364,11 +364,13 @@ export function ModalEstimasi({
           }
         }
         pageBreaks = [
-          ...Array.from(clone.children, (element) =>
-            element.getBoundingClientRect().bottom - cloneRect.top
+          ...Array.from(
+            clone.children,
+            (element) => element.getBoundingClientRect().bottom - cloneRect.top
           ),
-          ...Array.from(clone.querySelectorAll('tr'), (row) =>
-            row.getBoundingClientRect().bottom - cloneRect.top
+          ...Array.from(
+            clone.querySelectorAll('tr'),
+            (row) => row.getBoundingClientRect().bottom - cloneRect.top
           ),
         ]
         canvas = await html2canvas(clone, {
@@ -384,7 +386,11 @@ export function ModalEstimasi({
         document.body.removeChild(clone)
       }
 
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait',
+      })
 
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
@@ -397,7 +403,9 @@ export function ModalEstimasi({
       if (imgHeightMm <= pageContentHeight) {
         pageSlices.push({ start: 0, end: canvas.height })
       } else {
-        const pageHeightPx = Math.floor((pageContentHeight / contentWidth) * canvas.width)
+        const pageHeightPx = Math.floor(
+          (pageContentHeight / contentWidth) * canvas.width
+        )
         const scale = canvas.width / cloneWidth
         const pageBreaksPx = pageBreaks
           .map((breakpoint) => Math.round(breakpoint * scale))
@@ -438,12 +446,21 @@ export function ModalEstimasi({
         )
         const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98)
         const sliceHeightMm = (sliceCanvas.height * contentWidth) / canvas.width
-        pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceHeightMm)
+        pdf.addImage(
+          sliceData,
+          'JPEG',
+          margin,
+          margin,
+          contentWidth,
+          sliceHeightMm
+        )
       })
 
       if (pageLabelPosition) {
-        const labelX = margin + (pageLabelPosition.x / cloneWidth) * contentWidth
-        const labelY = margin + (pageLabelPosition.y / cloneWidth) * contentWidth
+        const labelX =
+          margin + (pageLabelPosition.x / cloneWidth) * contentWidth
+        const labelY =
+          margin + (pageLabelPosition.y / cloneWidth) * contentWidth
         pdf.setPage(1)
         pdf.setFillColor(255, 255, 255)
         pdf.rect(labelX, labelY, 32, 4, 'F')
@@ -458,7 +475,9 @@ export function ModalEstimasi({
       pdf.save(filename)
     } catch (err) {
       console.error('Download PDF error:', err)
-      alert(`Gagal membuat PDF: ${err instanceof Error ? err.message : String(err)}`)
+      alert(
+        `Gagal membuat PDF: ${err instanceof Error ? err.message : String(err)}`
+      )
     }
   }
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -576,7 +595,9 @@ export function ModalEstimasi({
 
     setSelectedRfsSearch(doc.projectName || '')
     setRfsDialogOpen(false)
-    alert(`Data RFS "${doc.projectName || 'Tanpa Judul'}" berhasil ditarik! (${doc.items?.length || 0} item)`)
+    alert(
+      `Data RFS "${doc.projectName || 'Tanpa Judul'}" berhasil ditarik! (${doc.items?.length || 0} item)`
+    )
   }
 
   useEffect(() => {
@@ -665,12 +686,12 @@ export function ModalEstimasi({
               quotationPpnPct,
             }
           : actualMode
-              ? {
-                  ...formInfo,
-                  modalAktualSubtotal: subTotal,
-                  modalAktualTotal: grandTotal,
-                }
-              : { ...formInfo, modalEstimasiSubtotal: subTotal },
+            ? {
+                ...formInfo,
+                modalAktualSubtotal: subTotal,
+                modalAktualTotal: grandTotal,
+              }
+            : { ...formInfo, modalEstimasiSubtotal: subTotal },
         items,
         costs,
         status,
@@ -1012,8 +1033,7 @@ export function ModalEstimasi({
         .flatMap((item) => {
           if (item.id !== id) return [item]
 
-          const [nextOption, ...remainingOptions] =
-            item.quotationOptions ?? []
+          const [nextOption, ...remainingOptions] = item.quotationOptions ?? []
           if (!nextOption) return []
 
           return [
@@ -1156,7 +1176,11 @@ export function ModalEstimasi({
 
   // Auto-reset discount ke 0% jika subtotal < 1.000.000
   useEffect(() => {
-    if (quotationMode && quotationSubtotal > 0 && quotationSubtotal < 1_000_000) {
+    if (
+      quotationMode &&
+      quotationSubtotal > 0 &&
+      quotationSubtotal < 1_000_000
+    ) {
       setQuotationDiscountPct('0')
       setQuotationDiscountAmount('0')
     }
@@ -1171,7 +1195,13 @@ export function ModalEstimasi({
     'Unit Price Estimasi',
     'Amount Estimasi',
     ...(actualMode
-      ? ['Qty Aktual', 'Satuan Aktual', 'Unit Price Aktual', 'Disc', 'Amount Aktual']
+      ? [
+          'Qty Aktual',
+          'Satuan Aktual',
+          'Unit Price Aktual',
+          'Disc',
+          'Amount Aktual',
+        ]
       : []),
     ...(!quotationMode ? ['Toko'] : []),
     ...(quotationMode ? ['Unit Price Quotation', 'Amount Quotation'] : []),
@@ -1736,7 +1766,9 @@ export function ModalEstimasi({
                         </Label>
                         <Input
                           value={formInfo.subject}
-                          onChange={(e) => updateInfo('subject', e.target.value)}
+                          onChange={(e) =>
+                            updateInfo('subject', e.target.value)
+                          }
                           placeholder='Subject'
                           className='h-7 min-w-0 flex-1 text-xs'
                         />
@@ -1751,7 +1783,12 @@ export function ModalEstimasi({
         {/* ── Spreadsheet container ── */}
         <div className='overflow-x-auto rounded-md border bg-background text-xs shadow-sm'>
           <QuotationModeContext.Provider value={quotationMode}>
-            <table className={['w-full border-collapse', actualMode ? 'min-w-[1500px]' : 'min-w-175'].join(' ')}>
+            <table
+              className={[
+                'w-full border-collapse',
+                actualMode ? 'min-w-[1500px]' : 'min-w-175',
+              ].join(' ')}
+            >
               <colgroup>
                 <col className='w-8' />
                 <col className='w-36' />
@@ -1797,401 +1834,410 @@ export function ModalEstimasi({
                 {/* ── Line items ── */}
                 {items.map((item) => (
                   <Fragment key={item.id}>
-                  <tr className='border-b hover:bg-muted/20'>
-                    <td className='border-r py-0.5 text-center'>
-                      <Cell value={String(item.no)} readOnly align='center' />
-                    </td>
-                    <td className='border-r py-0.5'>
-                      <Cell
-                        value={item.pn}
-                        onChange={(v) => updateItem(item.id, 'pn', v)}
-                        placeholder='P/N'
-                      />
-                    </td>
-                    <td className={['border-r py-0.5', actualMode ? 'min-w-[400px]' : ''].join(' ')}>
-                      <Cell
-                        value={item.description}
-                        onChange={(v) => updateItem(item.id, 'description', v)}
-                        placeholder='Description'
-                        className='font-semibold'
-                      />
-                      <Input
-                        value={item.note}
-                        onChange={(e) =>
-                          updateItem(item.id, 'note', e.target.value)
-                        }
-                        placeholder='Tambahkan catatan (opsional)...'
-                        className='mt-0.5 h-5 rounded-none border-0 bg-transparent px-1.5 py-0 text-[11px] text-red-500 italic shadow-none placeholder:text-red-300 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-inset'
-                      />
-                      {!quotationMode && !actualMode && (
-                        <button
-                          type='button'
-                          onClick={() => addQuotationOption(item.id)}
-                          className='mt-1 flex items-center gap-1 px-1.5 text-[10px] font-medium text-primary hover:underline'
-                        >
-                          <Plus className='h-3 w-3' />
-                          Tambah opsi harga
-                        </button>
-                      )}
-                    </td>
-                    <td className='border-r py-0.5'>
-                      <Cell
-                        value={item.qty}
-                        onChange={(v) => updateItem(item.id, 'qty', v)}
-                        placeholder='0'
-                        align='center'
-                      />
-                    </td>
-                    <td className='border-r py-0.5'>
-                      <Cell
-                        value={item.unit}
-                        onChange={(v) => updateItem(item.id, 'unit', v)}
-                        placeholder='PC'
-                        align='center'
-                      />
-                    </td>
-                    <td className='border-r py-0.5'>
-                      <Cell
-                        value={item.unitPrice}
-                        onChange={(v) => updateItem(item.id, 'unitPrice', v)}
-                        placeholder='0.000'
-                        align='right'
-                        formatThousand
-                      />
-                    </td>
-                    <td className='border-r py-0.5'>
-                      <Cell
-                        value={fmt(item.amount)}
-                        readOnly
-                        align='right'
-                        className='font-medium'
-                      />
-                    </td>
+                    <tr className='border-b hover:bg-muted/20'>
+                      <td className='border-r py-0.5 text-center'>
+                        <Cell value={String(item.no)} readOnly align='center' />
+                      </td>
+                      <td className='border-r py-0.5'>
+                        <Cell
+                          value={item.pn}
+                          onChange={(v) => updateItem(item.id, 'pn', v)}
+                          placeholder='P/N'
+                        />
+                      </td>
+                      <td
+                        className={[
+                          'border-r py-0.5',
+                          actualMode ? 'min-w-[400px]' : '',
+                        ].join(' ')}
+                      >
+                        <Cell
+                          value={item.description}
+                          onChange={(v) =>
+                            updateItem(item.id, 'description', v)
+                          }
+                          placeholder='Description'
+                          className='font-semibold'
+                        />
+                        <Input
+                          value={item.note}
+                          onChange={(e) =>
+                            updateItem(item.id, 'note', e.target.value)
+                          }
+                          placeholder='Tambahkan catatan (opsional)...'
+                          className='mt-0.5 h-5 rounded-none border-0 bg-transparent px-1.5 py-0 text-[11px] text-red-500 italic shadow-none placeholder:text-red-300 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-inset'
+                        />
+                        {!quotationMode && !actualMode && (
+                          <button
+                            type='button'
+                            onClick={() => addQuotationOption(item.id)}
+                            className='mt-1 flex items-center gap-1 px-1.5 text-[10px] font-medium text-primary hover:underline'
+                          >
+                            <Plus className='h-3 w-3' />
+                            Tambah opsi harga
+                          </button>
+                        )}
+                      </td>
+                      <td className='border-r py-0.5'>
+                        <Cell
+                          value={item.qty}
+                          onChange={(v) => updateItem(item.id, 'qty', v)}
+                          placeholder='0'
+                          align='center'
+                        />
+                      </td>
+                      <td className='border-r py-0.5'>
+                        <Cell
+                          value={item.unit}
+                          onChange={(v) => updateItem(item.id, 'unit', v)}
+                          placeholder='PC'
+                          align='center'
+                        />
+                      </td>
+                      <td className='border-r py-0.5'>
+                        <Cell
+                          value={item.unitPrice}
+                          onChange={(v) => updateItem(item.id, 'unitPrice', v)}
+                          placeholder='0.000'
+                          align='right'
+                          formatThousand
+                        />
+                      </td>
+                      <td className='border-r py-0.5'>
+                        <Cell
+                          value={fmt(item.amount)}
+                          readOnly
+                          align='right'
+                          className='font-medium'
+                        />
+                      </td>
 
-                    {actualMode && (
-                      <>
+                      {actualMode && (
+                        <>
+                          <td className='border-r py-0.5 align-top'>
+                            <div className='space-y-1.5'>
+                              <Cell
+                                value={item.qtyActual ?? item.qty}
+                                onChange={(v) =>
+                                  updateItem(item.id, 'qtyActual', v)
+                                }
+                                placeholder='0'
+                                align='center'
+                                className='w-full'
+                              />
+
+                              {(item.actualPriceVariants ?? []).map(
+                                (variant, index) => (
+                                  <Cell
+                                    key={`${item.id}-variant-qty-${index}`}
+                                    value={variant.qtyActual}
+                                    onChange={(v) =>
+                                      updateActualPriceVariant(
+                                        item.id,
+                                        index,
+                                        'qtyActual',
+                                        v
+                                      )
+                                    }
+                                    placeholder='Qty'
+                                    align='center'
+                                    className='w-full'
+                                  />
+                                )
+                              )}
+                            </div>
+                          </td>
+                          <td className='border-r py-0.5 align-top'>
+                            <Cell
+                              value={item.unitActual ?? item.unit}
+                              onChange={(v) =>
+                                updateItem(item.id, 'unitActual', v)
+                              }
+                              placeholder='PC'
+                              align='center'
+                              className='w-full'
+                            />
+                          </td>
+                          <td className='border-r py-0.5 align-top'>
+                            <div className='space-y-1.5'>
+                              <Cell
+                                value={item.unitPriceActual ?? ''}
+                                onChange={(v) =>
+                                  updateItem(item.id, 'unitPriceActual', v)
+                                }
+                                placeholder='0.000'
+                                align='right'
+                                formatThousand
+                                className='w-full min-w-[6rem]'
+                              />
+
+                              {(item.actualPriceVariants ?? []).map(
+                                (variant, index) => (
+                                  <Cell
+                                    key={`${item.id}-variant-price-${index}`}
+                                    value={variant.price}
+                                    onChange={(v) =>
+                                      updateActualPriceVariant(
+                                        item.id,
+                                        index,
+                                        'price',
+                                        v
+                                      )
+                                    }
+                                    placeholder='0.000'
+                                    align='right'
+                                    formatThousand
+                                    className='w-full min-w-[6rem]'
+                                  />
+                                )
+                              )}
+
+                              <button
+                                type='button'
+                                onClick={() => addActualPriceVariant(item.id)}
+                                className='text-[10px] font-medium text-primary hover:underline'
+                              >
+                                + toko lain
+                              </button>
+                            </div>
+                          </td>
+                          <td className='border-r py-0.5 align-top'>
+                            <Cell
+                              value={item.discActual ?? ''}
+                              onChange={(v) => {
+                                let newVal = v
+                                if (v && !v.includes('%')) {
+                                  const digits = v.replace(/\D/g, '')
+                                  newVal = digits
+                                    ? Number(digits).toLocaleString('id-ID')
+                                    : ''
+                                }
+                                updateItem(item.id, 'discActual', newVal)
+                              }}
+                              placeholder='0 / 0%'
+                              align='center'
+                              className='w-full'
+                            />
+                          </td>
+                          <td className='border-r py-0.5'>
+                            <Cell
+                              value={fmt(item.amountActual ?? 0)}
+                              readOnly
+                              align='right'
+                              className='font-medium'
+                            />
+                          </td>
+                        </>
+                      )}
+
+                      {!quotationMode && (
                         <td className='border-r py-0.5 align-top'>
                           <div className='space-y-1.5'>
                             <Cell
-                              value={item.qtyActual ?? item.qty}
-                              onChange={(v) =>
-                                updateItem(item.id, 'qtyActual', v)
-                              }
-                              placeholder='0'
+                              value={item.toko ?? ''}
+                              onChange={(v) => updateItem(item.id, 'toko', v)}
+                              placeholder='Toko'
                               align='center'
-                              className='w-full'
+                              className='font-medium'
                             />
 
                             {(item.actualPriceVariants ?? []).map(
                               (variant, index) => (
                                 <Cell
-                                  key={`${item.id}-variant-qty-${index}`}
-                                  value={variant.qtyActual}
-                                  onChange={(v) =>
+                                  key={`${item.id}-variant-toko-${index}`}
+                                  value={variant.toko}
+                                  onChange={(e) =>
                                     updateActualPriceVariant(
                                       item.id,
                                       index,
-                                      'qtyActual',
-                                      v
+                                      'toko',
+                                      e
                                     )
                                   }
-                                  placeholder='Qty'
+                                  placeholder='Toko baru'
                                   align='center'
-                                  className='w-full'
+                                  className='font-medium'
                                 />
                               )
                             )}
                           </div>
                         </td>
-                        <td className='border-r py-0.5 align-top'>
-                          <Cell
-                            value={item.unitActual ?? item.unit}
-                            onChange={(v) =>
-                              updateItem(item.id, 'unitActual', v)
-                            }
-                            placeholder='PC'
-                            align='center'
-                            className='w-full'
-                          />
-                        </td>
-                        <td className='border-r py-0.5 align-top'>
-                          <div className='space-y-1.5'>
+                      )}
+
+                      {quotationMode && (
+                        <>
+                          <td className='border-r py-0.5'>
                             <Cell
-                              value={item.unitPriceActual ?? ''}
+                              value={
+                                item.unitPriceQuo?.trim() ||
+                                fmt(getQuotationUnitPrice(item))
+                              }
                               onChange={(v) =>
-                                updateItem(item.id, 'unitPriceActual', v)
+                                updateItem(item.id, 'unitPriceQuo', v)
                               }
                               placeholder='0.000'
                               align='right'
                               formatThousand
-                              className='w-full min-w-[6rem]'
                             />
+                          </td>
+                          <td className='border-r py-0.5'>
+                            <Cell
+                              value={fmt(
+                                parseNum(item.qty) * getQuotationUnitPrice(item)
+                              )}
+                              readOnly
+                              align='right'
+                              className='font-medium'
+                            />
+                          </td>
+                        </>
+                      )}
 
-                            {(item.actualPriceVariants ?? []).map(
-                              (variant, index) => (
+                      <td className='py-0.5 text-center'>
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className='p-0.5 text-muted-foreground transition-colors hover:text-destructive'
+                          title={
+                            item.quotationOptions?.length
+                              ? 'Hapus opsi utama dan tampilkan opsi berikutnya'
+                              : 'Hapus item'
+                          }
+                        >
+                          <Trash2 className='h-3 w-3' />
+                        </button>
+                      </td>
+                    </tr>
+                    {!actualMode &&
+                      (item.quotationOptions ?? []).map((option, index) => (
+                        <tr
+                          key={`${item.id}-quotation-option-${index}`}
+                          className='border-b bg-muted/10'
+                        >
+                          <td colSpan={2} className='border-r py-0.5' />
+                          <td className='border-r py-0.5'>
+                            <div className='px-1.5 pt-1 text-[10px] font-medium text-muted-foreground'>
+                              Opsi harga {index + 1}
+                            </div>
+                            <Input
+                              value={option.note}
+                              onChange={(event) =>
+                                updateQuotationOption(
+                                  item.id,
+                                  index,
+                                  'note',
+                                  event.target.value
+                                )
+                              }
+                              placeholder='Catatan / merek opsi...'
+                              className='h-6 rounded-none border-0 bg-transparent px-1.5 text-[11px] text-red-500 italic shadow-none placeholder:text-red-300 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-inset'
+                              aria-label={`Catatan opsi harga ${index + 1} untuk ${item.description}`}
+                            />
+                          </td>
+                          <td className='border-r px-1.5 py-0.5 text-center text-xs text-muted-foreground'>
+                            {item.qty || '-'}
+                          </td>
+                          <td className='border-r px-1.5 py-0.5 text-center text-xs text-muted-foreground'>
+                            {item.unit || '-'}
+                          </td>
+                          {quotationMode ? (
+                            <>
+                              <td className='border-r py-0.5'>
                                 <Cell
-                                  key={`${item.id}-variant-price-${index}`}
-                                  value={variant.price}
-                                  onChange={(v) =>
-                                    updateActualPriceVariant(
+                                  value={fmtInputDisplay(option.unitPrice)}
+                                  readOnly
+                                  align='right'
+                                  formatThousand
+                                />
+                              </td>
+                              <td className='border-r py-0.5'>
+                                <Cell
+                                  value={fmt(
+                                    parseNum(item.qty) *
+                                      parseNum(option.unitPrice)
+                                  )}
+                                  readOnly
+                                  align='right'
+                                  className='font-medium'
+                                />
+                              </td>
+                              <td className='border-r py-0.5'>
+                                <Cell
+                                  value={
+                                    option.unitPriceQuo?.trim() ||
+                                    fmt(getQuotationOptionUnitPrice(option))
+                                  }
+                                  onChange={(value) =>
+                                    updateQuotationOption(
                                       item.id,
                                       index,
-                                      'price',
-                                      v
+                                      'unitPriceQuo',
+                                      value
                                     )
                                   }
                                   placeholder='0.000'
                                   align='right'
                                   formatThousand
-                                  className='w-full min-w-[6rem]'
                                 />
-                              )
-                            )}
-
+                              </td>
+                              <td className='border-r py-0.5'>
+                                <Cell
+                                  value={fmt(
+                                    parseNum(item.qty) *
+                                      getQuotationOptionUnitPrice(option)
+                                  )}
+                                  readOnly
+                                  align='right'
+                                  className='font-medium'
+                                />
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className='border-r py-0.5'>
+                                <Cell
+                                  value={option.unitPrice}
+                                  onChange={(value) =>
+                                    updateQuotationOption(
+                                      item.id,
+                                      index,
+                                      'unitPrice',
+                                      value
+                                    )
+                                  }
+                                  placeholder='0.000'
+                                  align='right'
+                                  formatThousand
+                                />
+                              </td>
+                              <td className='border-r py-0.5'>
+                                <Cell
+                                  value={fmt(
+                                    parseNum(item.qty) *
+                                      parseNum(option.unitPrice)
+                                  )}
+                                  readOnly
+                                  align='right'
+                                  className='font-medium'
+                                />
+                              </td>
+                            </>
+                          )}
+                          {!quotationMode && <td className='border-r py-0.5' />}
+                          <td className='py-0.5 text-center'>
                             <button
                               type='button'
-                              onClick={() => addActualPriceVariant(item.id)}
-                              className='text-[10px] font-medium text-primary hover:underline'
-                            >
-                              + toko lain
-                            </button>
-                          </div>
-                        </td>
-                        <td className='border-r py-0.5 align-top'>
-                          <Cell
-                            value={item.discActual ?? ''}
-                            onChange={(v) => {
-                              let newVal = v
-                              if (v && !v.includes('%')) {
-                                const digits = v.replace(/\D/g, '')
-                                newVal = digits ? Number(digits).toLocaleString('id-ID') : ''
+                              onClick={() =>
+                                removeQuotationOption(item.id, index)
                               }
-                              updateItem(item.id, 'discActual', newVal)
-                            }}
-                            placeholder='0 / 0%'
-                            align='center'
-                            className='w-full'
-                          />
-                        </td>
-                        <td className='border-r py-0.5'>
-                          <Cell
-                            value={fmt(item.amountActual ?? 0)}
-                            readOnly
-                            align='right'
-                            className='font-medium'
-                          />
-                        </td>
-                      </>
-                    )}
-
-                    {!quotationMode && (
-                      <td className='border-r py-0.5 align-top'>
-                        <div className='space-y-1.5'>
-                          <Cell
-                            value={item.toko ?? ''}
-                            onChange={(v) => updateItem(item.id, 'toko', v)}
-                            placeholder='Toko'
-                            align='center'
-                            className='font-medium'
-                          />
-
-                          {(item.actualPriceVariants ?? []).map(
-                            (variant, index) => (
-                              <Cell
-                                key={`${item.id}-variant-toko-${index}`}
-                                value={variant.toko}
-                                onChange={(e) =>
-                                  updateActualPriceVariant(
-                                    item.id,
-                                    index,
-                                    'toko',
-                                    e
-                                  )
-                                }
-                                placeholder='Toko baru'
-                                align='center'
-                                className='font-medium'
-                              />
-                            )
-                          )}
-                        </div>
-                      </td>
-                    )}
-
-                    {quotationMode && (
-                      <>
-                        <td className='border-r py-0.5'>
-                          <Cell
-                            value={
-                              item.unitPriceQuo?.trim() ||
-                              fmt(getQuotationUnitPrice(item))
-                            }
-                            onChange={(v) =>
-                              updateItem(item.id, 'unitPriceQuo', v)
-                            }
-                            placeholder='0.000'
-                            align='right'
-                            formatThousand
-                          />
-                        </td>
-                        <td className='border-r py-0.5'>
-                          <Cell
-                            value={fmt(
-                              parseNum(item.qty) * getQuotationUnitPrice(item)
-                            )}
-                            readOnly
-                            align='right'
-                            className='font-medium'
-                          />
-                        </td>
-                      </>
-                    )}
-
-                    <td className='py-0.5 text-center'>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className='p-0.5 text-muted-foreground transition-colors hover:text-destructive'
-                        title={
-                          item.quotationOptions?.length
-                            ? 'Hapus opsi utama dan tampilkan opsi berikutnya'
-                            : 'Hapus item'
-                        }
-                      >
-                        <Trash2 className='h-3 w-3' />
-                      </button>
-                    </td>
-                  </tr>
-                  {!actualMode &&
-                    (item.quotationOptions ?? []).map((option, index) => (
-                      <tr
-                        key={`${item.id}-quotation-option-${index}`}
-                        className='border-b bg-muted/10'
-                      >
-                        <td colSpan={2} className='border-r py-0.5' />
-                        <td className='border-r py-0.5'>
-                          <div className='px-1.5 pt-1 text-[10px] font-medium text-muted-foreground'>
-                            Opsi harga {index + 1}
-                          </div>
-                          <Input
-                            value={option.note}
-                            onChange={(event) =>
-                              updateQuotationOption(
-                                item.id,
-                                index,
-                                'note',
-                                event.target.value
-                              )
-                            }
-                            placeholder='Catatan / merek opsi...'
-                            className='h-6 rounded-none border-0 bg-transparent px-1.5 text-[11px] text-red-500 italic shadow-none placeholder:text-red-300 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-inset'
-                            aria-label={`Catatan opsi harga ${index + 1} untuk ${item.description}`}
-                          />
-                        </td>
-                        <td className='border-r px-1.5 py-0.5 text-center text-xs text-muted-foreground'>
-                          {item.qty || '-'}
-                        </td>
-                        <td className='border-r px-1.5 py-0.5 text-center text-xs text-muted-foreground'>
-                          {item.unit || '-'}
-                        </td>
-                        {quotationMode ? (
-                          <>
-                            <td className='border-r py-0.5'>
-                              <Cell
-                                value={fmtInputDisplay(option.unitPrice)}
-                                readOnly
-                                align='right'
-                                formatThousand
-                              />
-                            </td>
-                            <td className='border-r py-0.5'>
-                              <Cell
-                                value={fmt(
-                                  parseNum(item.qty) *
-                                    parseNum(option.unitPrice)
-                                )}
-                                readOnly
-                                align='right'
-                                className='font-medium'
-                              />
-                            </td>
-                            <td className='border-r py-0.5'>
-                              <Cell
-                                value={
-                                  option.unitPriceQuo?.trim() ||
-                                  fmt(getQuotationOptionUnitPrice(option))
-                                }
-                                onChange={(value) =>
-                                  updateQuotationOption(
-                                    item.id,
-                                    index,
-                                    'unitPriceQuo',
-                                    value
-                                  )
-                                }
-                                placeholder='0.000'
-                                align='right'
-                                formatThousand
-                              />
-                            </td>
-                            <td className='border-r py-0.5'>
-                              <Cell
-                                value={fmt(
-                                  parseNum(item.qty) *
-                                    getQuotationOptionUnitPrice(option)
-                                )}
-                                readOnly
-                                align='right'
-                                className='font-medium'
-                              />
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className='border-r py-0.5'>
-                              <Cell
-                                value={option.unitPrice}
-                                onChange={(value) =>
-                                  updateQuotationOption(
-                                    item.id,
-                                    index,
-                                    'unitPrice',
-                                    value
-                                  )
-                                }
-                                placeholder='0.000'
-                                align='right'
-                                formatThousand
-                              />
-                            </td>
-                            <td className='border-r py-0.5'>
-                              <Cell
-                                value={fmt(
-                                  parseNum(item.qty) *
-                                    parseNum(option.unitPrice)
-                                )}
-                                readOnly
-                                align='right'
-                                className='font-medium'
-                              />
-                            </td>
-                          </>
-                        )}
-                        {!quotationMode && <td className='border-r py-0.5' />}
-                        <td className='py-0.5 text-center'>
-                          <button
-                            type='button'
-                            onClick={() =>
-                              removeQuotationOption(item.id, index)
-                            }
-                            className='p-0.5 text-muted-foreground transition-colors hover:text-destructive'
-                            title='Hapus opsi harga'
-                            aria-label={`Hapus opsi harga ${index + 1} untuk ${item.description}`}
-                          >
-                            <Trash2 className='h-3 w-3' />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                              className='p-0.5 text-muted-foreground transition-colors hover:text-destructive'
+                              title='Hapus opsi harga'
+                              aria-label={`Hapus opsi harga ${index + 1} untuk ${item.description}`}
+                            >
+                              <Trash2 className='h-3 w-3' />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                   </Fragment>
                 ))}
 
@@ -2338,11 +2384,12 @@ export function ModalEstimasi({
                             label='Sub Total'
                             value={quotationSubtotal}
                           />
-                          {quotationSubtotal > 0 && quotationSubtotal < 1_000_000 && (
-                            <div className='rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-700'>
-                              ⚠ Tidak Mendapatkan Discount
-                            </div>
-                          )}
+                          {quotationSubtotal > 0 &&
+                            quotationSubtotal < 1_000_000 && (
+                              <div className='rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-700'>
+                                ⚠ Tidak Mendapatkan Discount
+                              </div>
+                            )}
                           <QuotationSummaryRow
                             label={
                               <span className='flex items-center gap-1'>
@@ -2367,11 +2414,17 @@ export function ModalEstimasi({
                                 min='0'
                                 value={
                                   quotationDiscountAmount
-                                    ? Number(quotationDiscountAmount).toLocaleString('id-ID')
-                                    : Math.round(quotationDiscount).toLocaleString('id-ID')
+                                    ? Number(
+                                        quotationDiscountAmount
+                                      ).toLocaleString('id-ID')
+                                    : Math.round(
+                                        quotationDiscount
+                                      ).toLocaleString('id-ID')
                                 }
                                 onChange={(event) => {
-                                  const raw = event.target.value.replace(/\./g, '').replace(/,/g, '')
+                                  const raw = event.target.value
+                                    .replace(/\./g, '')
+                                    .replace(/,/g, '')
                                   setQuotationDiscountAmount(raw)
                                 }}
                                 aria-label='Discount amount'
@@ -2391,8 +2444,7 @@ export function ModalEstimasi({
                             label={
                               <span className='flex items-center gap-1'>
                                 PPN
-                                <span>{quotationPpnPct}</span>
-                                %
+                                <span>{quotationPpnPct}</span>%
                               </span>
                             }
                             value={quotationPpn}
@@ -3108,17 +3160,18 @@ export function ModalEstimasi({
 
       {/* Dialog Tarik RFS dari Vendor Analytic */}
       <Dialog open={rfsDialogOpen} onOpenChange={setRfsDialogOpen}>
-        <DialogContent className='max-h-[85vh] overflow-hidden flex flex-col sm:max-w-2xl'>
+        <DialogContent className='flex max-h-[85vh] flex-col overflow-hidden sm:max-w-2xl'>
           <DialogHeader>
             <DialogTitle>Tarik Data RFS (Vendor Analytic)</DialogTitle>
             <DialogDescription>
-              Pilih data RFS / Project yang telah disimpan di halaman Vendor Analytic untuk dimasukkan ke Modal Estimasi.
+              Pilih data RFS / Project yang telah disimpan di halaman Vendor
+              Analytic untuk dimasukkan ke Modal Estimasi.
             </DialogDescription>
           </DialogHeader>
 
           <div className='my-2 flex items-center gap-2'>
             <div className='relative flex-1'>
-              <SearchIcon className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
+              <SearchIcon className='absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground' />
               <Input
                 placeholder='Cari nomor RFS atau nama project...'
                 value={rfsFilterQuery}
@@ -3128,13 +3181,17 @@ export function ModalEstimasi({
             </div>
           </div>
 
-          <div className='flex-1 overflow-y-auto divide-y rounded-md border'>
+          <div className='flex-1 divide-y overflow-y-auto rounded-md border'>
             {rfsHistory.filter((doc) => {
               if (!rfsFilterQuery.trim()) return true
               const q = rfsFilterQuery.toLowerCase()
               return (
-                (doc.projectName && doc.projectName.toLowerCase().includes(q)) ||
-                (doc.vendors && doc.vendors.some((v: any) => v.name?.toLowerCase().includes(q)))
+                (doc.projectName &&
+                  doc.projectName.toLowerCase().includes(q)) ||
+                (doc.vendors &&
+                  doc.vendors.some((v: any) =>
+                    v.name?.toLowerCase().includes(q)
+                  ))
               )
             }).length === 0 ? (
               <div className='py-8 text-center text-sm text-muted-foreground'>
@@ -3148,8 +3205,12 @@ export function ModalEstimasi({
                   if (!rfsFilterQuery.trim()) return true
                   const q = rfsFilterQuery.toLowerCase()
                   return (
-                    (doc.projectName && doc.projectName.toLowerCase().includes(q)) ||
-                    (doc.vendors && doc.vendors.some((v: any) => v.name?.toLowerCase().includes(q)))
+                    (doc.projectName &&
+                      doc.projectName.toLowerCase().includes(q)) ||
+                    (doc.vendors &&
+                      doc.vendors.some((v: any) =>
+                        v.name?.toLowerCase().includes(q)
+                      ))
                   )
                 })
                 .map((doc) => (
@@ -3157,8 +3218,8 @@ export function ModalEstimasi({
                     key={doc.id}
                     className='flex items-center justify-between p-3 transition-colors hover:bg-muted/50'
                   >
-                    <div className='space-y-1 min-w-0 pr-3'>
-                      <div className='font-semibold text-sm truncate'>
+                    <div className='min-w-0 space-y-1 pr-3'>
+                      <div className='truncate text-sm font-semibold'>
                         {doc.projectName || 'Tanpa Nama RFS'}
                       </div>
                       <div className='flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
@@ -3174,11 +3235,18 @@ export function ModalEstimasi({
                         <span>•</span>
                         <span>{doc.items?.length || 0} Item</span>
                         <span>•</span>
-                        <span>Kurs: Rp {Number(doc.usdRate || 17500).toLocaleString('id-ID')}</span>
+                        <span>
+                          Kurs: Rp{' '}
+                          {Number(doc.usdRate || 17500).toLocaleString('id-ID')}
+                        </span>
                       </div>
                       {doc.vendors && doc.vendors.length > 0 && (
-                        <div className='text-[11px] text-muted-foreground truncate'>
-                          Vendor: {doc.vendors.map((v: any) => v.name).filter(Boolean).join(', ')}
+                        <div className='truncate text-[11px] text-muted-foreground'>
+                          Vendor:{' '}
+                          {doc.vendors
+                            .map((v: any) => v.name)
+                            .filter(Boolean)
+                            .join(', ')}
                         </div>
                       )}
                     </div>
@@ -3266,7 +3334,9 @@ function EstimasiReport({
         <div className='text-base font-bold'>{formInfo.pt || '-'}</div>
         <div className='text-sm'>{formInfo.kapal || '-'}</div>
         <div className='text-sm'>Nama Mesin: {formInfo.machineName || '-'}</div>
-        <div className='text-sm'>Detail Mesin: {formInfo.machineDetail || '-'}</div>
+        <div className='text-sm'>
+          Detail Mesin: {formInfo.machineDetail || '-'}
+        </div>
         <div className='text-sm'>Maker: {formInfo.machineMaker || '-'}</div>
       </div>
       <table className='w-full border-collapse text-xs'>
@@ -3305,80 +3375,80 @@ function EstimasiReport({
         <tbody>
           {items.map((item) => (
             <Fragment key={item.id}>
-            {actualMode ? (
-              <tr className='border-b'>
-                <td className='px-1.5 py-1'>{item.no}</td>
-                <td className='px-1.5 py-1'>{item.pn}</td>
-                <td className='px-1.5 py-1'>
-                  <div>{item.description}</div>
-                  {item.note && (
-                    <div className='text-[11px] italic text-red-500'>
-                      {item.note}
-                    </div>
-                  )}
-                </td>
-                <td className='px-1.5 py-1'>
-                  {item.qtyActual || item.qty} {item.unitActual || item.unit}
-                </td>
-                <td className='px-1.5 py-1 text-right'>
-                  {fmt(parseNum(item.unitPriceActual ?? ''))}
-                </td>
-                <td className='px-1.5 py-1 text-center'>
-                  {item.discActual || '-'}
-                </td>
-                <td className='px-1.5 py-1 text-right'>
-                  {fmt(item.amountActual ?? 0)}
-                </td>
-                <td className='px-1.5 py-1'>{item.toko || '-'}</td>
-              </tr>
-            ) : (
-              <tr className='border-b'>
-                <td className='px-1.5 py-1'>{item.no}</td>
-                <td className='px-1.5 py-1'>{item.pn}</td>
-                <td className='px-1.5 py-1'>
-                  <div>{item.description}</div>
-                  {item.note && (
-                    <div className='text-[11px] italic text-red-500'>
-                      {item.note}
-                    </div>
-                  )}
-                </td>
-                <td className='px-1.5 py-1'>
-                  {item.qty} {item.unit}
-                </td>
-                <td className='px-1.5 py-1'>{item.toko || '-'}</td>
-                <td className='px-1.5 py-1 text-right'>
-                  {fmt(parseNum(item.unitPrice))}
-                </td>
-                <td className='px-1.5 py-1 text-right'>{fmt(item.amount)}</td>
-              </tr>
-            )}
-            {!actualMode &&
-              (item.quotationOptions ?? []).map((option, index) => (
-                <tr
-                  key={`${item.id}-quotation-option-${index}`}
-                  className='border-b bg-slate-50'
-                >
+              {actualMode ? (
+                <tr className='border-b'>
                   <td className='px-1.5 py-1'>{item.no}</td>
                   <td className='px-1.5 py-1'>{item.pn}</td>
                   <td className='px-1.5 py-1'>
                     <div>{item.description}</div>
-                    <div className='text-[11px] italic text-red-500'>
-                      {option.note || `Opsi harga ${index + 1}`}
-                    </div>
+                    {item.note && (
+                      <div className='text-[11px] text-red-500 italic'>
+                        {item.note}
+                      </div>
+                    )}
+                  </td>
+                  <td className='px-1.5 py-1'>
+                    {item.qtyActual || item.qty} {item.unitActual || item.unit}
+                  </td>
+                  <td className='px-1.5 py-1 text-right'>
+                    {fmt(parseNum(item.unitPriceActual ?? ''))}
+                  </td>
+                  <td className='px-1.5 py-1 text-center'>
+                    {item.discActual || '-'}
+                  </td>
+                  <td className='px-1.5 py-1 text-right'>
+                    {fmt(item.amountActual ?? 0)}
+                  </td>
+                  <td className='px-1.5 py-1'>{item.toko || '-'}</td>
+                </tr>
+              ) : (
+                <tr className='border-b'>
+                  <td className='px-1.5 py-1'>{item.no}</td>
+                  <td className='px-1.5 py-1'>{item.pn}</td>
+                  <td className='px-1.5 py-1'>
+                    <div>{item.description}</div>
+                    {item.note && (
+                      <div className='text-[11px] text-red-500 italic'>
+                        {item.note}
+                      </div>
+                    )}
                   </td>
                   <td className='px-1.5 py-1'>
                     {item.qty} {item.unit}
                   </td>
                   <td className='px-1.5 py-1'>{item.toko || '-'}</td>
                   <td className='px-1.5 py-1 text-right'>
-                    {fmt(parseNum(option.unitPrice))}
+                    {fmt(parseNum(item.unitPrice))}
                   </td>
-                  <td className='px-1.5 py-1 text-right'>
-                    {fmt(parseNum(item.qty) * parseNum(option.unitPrice))}
-                  </td>
+                  <td className='px-1.5 py-1 text-right'>{fmt(item.amount)}</td>
                 </tr>
-              ))}
+              )}
+              {!actualMode &&
+                (item.quotationOptions ?? []).map((option, index) => (
+                  <tr
+                    key={`${item.id}-quotation-option-${index}`}
+                    className='border-b bg-slate-50'
+                  >
+                    <td className='px-1.5 py-1'>{item.no}</td>
+                    <td className='px-1.5 py-1'>{item.pn}</td>
+                    <td className='px-1.5 py-1'>
+                      <div>{item.description}</div>
+                      <div className='text-[11px] text-red-500 italic'>
+                        {option.note || `Opsi harga ${index + 1}`}
+                      </div>
+                    </td>
+                    <td className='px-1.5 py-1'>
+                      {item.qty} {item.unit}
+                    </td>
+                    <td className='px-1.5 py-1'>{item.toko || '-'}</td>
+                    <td className='px-1.5 py-1 text-right'>
+                      {fmt(parseNum(option.unitPrice))}
+                    </td>
+                    <td className='px-1.5 py-1 text-right'>
+                      {fmt(parseNum(item.qty) * parseNum(option.unitPrice))}
+                    </td>
+                  </tr>
+                ))}
             </Fragment>
           ))}
         </tbody>
@@ -3488,7 +3558,9 @@ function QuotationReport({
       <div className='flex items-start justify-between border-b pb-3'>
         <div>
           <div className='text-2xl font-bold text-sky-700'>
-            <span className='text-3xl text-green-600'>H</span>ALUAN <span className='text-3xl text-green-600'>D</span>AYA <span className='text-3xl text-green-600'>N</span>IAGA, PT.
+            <span className='text-3xl text-green-600'>H</span>ALUAN{' '}
+            <span className='text-3xl text-green-600'>D</span>AYA{' '}
+            <span className='text-3xl text-green-600'>N</span>IAGA, PT.
           </div>
           <div className='mt-1 text-[10px] tracking-[0.25em] text-slate-500'>
             NPWP: 07.312.145.3-502.000
@@ -3531,42 +3603,42 @@ function QuotationReport({
           </div>
         </div>
       ) : (
-      <div className='grid grid-cols-2 gap-5 text-xs sm:grid-cols-[1fr_320px]'>
-        {!inquiryMode && (
-          <div>
-            <div className='font-bold'>{formInfo.pt || '-'}</div>
-            <div>{formInfo.noRfs || formInfo.noQuo || '-'}</div>
-            <div>{formInfo.kapal || '-'}</div>
-            <div>Nama Mesin: {formInfo.machineName || '-'}</div>
-            <div>Detail Mesin: {formInfo.machineDetail || '-'}</div>
-            <div>Maker: {formInfo.machineMaker || '-'}</div>
-            <div>Attn: {customer?.kontak || '-'}</div>
+        <div className='grid grid-cols-2 gap-5 text-xs sm:grid-cols-[1fr_320px]'>
+          {!inquiryMode && (
+            <div>
+              <div className='font-bold'>{formInfo.pt || '-'}</div>
+              <div>{formInfo.noRfs || formInfo.noQuo || '-'}</div>
+              <div>{formInfo.kapal || '-'}</div>
+              <div>Nama Mesin: {formInfo.machineName || '-'}</div>
+              <div>Detail Mesin: {formInfo.machineDetail || '-'}</div>
+              <div>Maker: {formInfo.machineMaker || '-'}</div>
+              <div>Attn: {customer?.kontak || '-'}</div>
+            </div>
+          )}
+          {inquiryMode && <div />}
+          <div className='grid grid-cols-[115px_1fr] gap-y-1'>
+            <span className='font-bold'>NO</span>
+            <span>: {formInfo.noQuo || '-'}</span>
+            {!inquiryMode && (
+              <>
+                <span className='font-bold'>CUSTOMER ID</span>
+                <span>: {customer?.id || '-'}</span>
+              </>
+            )}
+            <span className='font-bold'>DATE</span>
+            <span>: {reportDate}</span>
+            {!inquiryMode && (
+              <>
+                <span className='font-bold'>PAGE</span>
+                <span data-pdf-page-number>: 1</span>
+                <span className='font-bold'>SUBJECT</span>
+                <span>: {formInfo.subject || '-'}</span>
+                <span className='font-bold'>SUPPLY LOCATION</span>
+                <span>: {formInfo.supplyLocation || '-'}</span>
+              </>
+            )}
           </div>
-        )}
-        {inquiryMode && <div />}
-        <div className='grid grid-cols-[115px_1fr] gap-y-1'>
-          <span className='font-bold'>NO</span>
-          <span>: {formInfo.noQuo || '-'}</span>
-          {!inquiryMode && (
-            <>
-              <span className='font-bold'>CUSTOMER ID</span>
-              <span>: {customer?.id || '-'}</span>
-            </>
-          )}
-          <span className='font-bold'>DATE</span>
-          <span>: {reportDate}</span>
-          {!inquiryMode && (
-            <>
-              <span className='font-bold'>PAGE</span>
-              <span data-pdf-page-number>: 1</span>
-              <span className='font-bold'>SUBJECT</span>
-              <span>: {formInfo.subject || '-'}</span>
-              <span className='font-bold'>SUPPLY LOCATION</span>
-              <span>: {formInfo.supplyLocation || '-'}</span>
-            </>
-          )}
         </div>
-      </div>
       )}
       <table className='w-full border-collapse text-xs'>
         <thead>
@@ -3576,7 +3648,9 @@ function QuotationReport({
               'CODE',
               'Description',
               'Quantity',
-              ...(!inquiryMode ? ['Unit Price', 'Amount'] : ['Unit Price', 'Amount']),
+              ...(!inquiryMode
+                ? ['Unit Price', 'Amount']
+                : ['Unit Price', 'Amount']),
             ].map((header) => (
               <th
                 key={header}
@@ -3600,7 +3674,7 @@ function QuotationReport({
                   <td className='px-1.5 py-1'>
                     <div>{item.description}</div>
                     {item.note && (
-                      <div className='text-[11px] italic text-red-500'>
+                      <div className='text-[11px] text-red-500 italic'>
                         {item.note}
                       </div>
                     )}
@@ -3627,8 +3701,7 @@ function QuotationReport({
                 </tr>
                 {(item.quotationOptions ?? [])
                   .filter(
-                    (option) =>
-                      option.note.trim() || option.unitPrice.trim()
+                    (option) => option.note.trim() || option.unitPrice.trim()
                   )
                   .map((option, index) => {
                     const optionUnitPrice = option.unitPriceQuo?.trim()
@@ -3645,7 +3718,7 @@ function QuotationReport({
                         <td className='px-1.5 py-1'>{item.pn}</td>
                         <td className='px-1.5 py-1'>
                           <div>{item.description}</div>
-                          <div className='text-[11px] italic text-red-500'>
+                          <div className='text-[11px] text-red-500 italic'>
                             {option.note || `Opsi harga ${index + 1}`}
                           </div>
                         </td>
@@ -3679,41 +3752,50 @@ function QuotationReport({
         </tbody>
       </table>
       {!inquiryMode && (
-      <div className='grid gap-5 text-xs md:grid-cols-2'>
-        <div className='space-y-1 font-medium'>
-          <div className='font-bold'># Note</div>
-          <div className='whitespace-pre-line'>{quotationDetails.note}</div>
-          <ReportTextRow label='# Delivery' value={quotationDetails.delivery} />
-          <ReportTextRow label='# Price' value={quotationDetails.price} />
-          <ReportTextRow label='# Payment' value={quotationDetails.payment} />
-          <ReportTextRow
-            label='# Stock Validity'
-            value={quotationDetails.stockValidity}
-          />
-          <ReportTextRow
-            label='# Price Validity'
-            value={quotationDetails.priceValidity}
-          />
-        </div>
-        {!inquiryMode && (
-          <div className='self-start'>
-            <ReportRow label='Sub Total' value={quotationSubtotal} />
-            <ReportRow label={`Discount (${quotationDiscountPct}%)`} value={-quotationDiscount} />
-            <ReportRow
-              label='Total after discount'
-              value={quotationAfterDiscount}
+        <div className='grid gap-5 text-xs md:grid-cols-2'>
+          <div className='space-y-1 font-medium'>
+            <div className='font-bold'># Note</div>
+            <div className='whitespace-pre-line'>{quotationDetails.note}</div>
+            <ReportTextRow
+              label='# Delivery'
+              value={quotationDetails.delivery}
             />
-            <ReportRow label='DPP' value={quotationDpp} />
-            <ReportRow label={`PPN ${quotationPpnPct}%`} value={quotationPpn} />
-            <div className='mt-1 bg-slate-100 p-2 text-sm font-bold'>
-              <ReportRow
-                label='TOTAL QUOTATION MUST BE PAID (IDR)'
-                value={quotationTotal}
-              />
-            </div>
+            <ReportTextRow label='# Price' value={quotationDetails.price} />
+            <ReportTextRow label='# Payment' value={quotationDetails.payment} />
+            <ReportTextRow
+              label='# Stock Validity'
+              value={quotationDetails.stockValidity}
+            />
+            <ReportTextRow
+              label='# Price Validity'
+              value={quotationDetails.priceValidity}
+            />
           </div>
-        )}
-      </div>
+          {!inquiryMode && (
+            <div className='self-start'>
+              <ReportRow label='Sub Total' value={quotationSubtotal} />
+              <ReportRow
+                label={`Discount (${quotationDiscountPct}%)`}
+                value={-quotationDiscount}
+              />
+              <ReportRow
+                label='Total after discount'
+                value={quotationAfterDiscount}
+              />
+              <ReportRow label='DPP' value={quotationDpp} />
+              <ReportRow
+                label={`PPN ${quotationPpnPct}%`}
+                value={quotationPpn}
+              />
+              <div className='mt-1 bg-slate-100 p-2 text-sm font-bold'>
+                <ReportRow
+                  label='TOTAL QUOTATION MUST BE PAID (IDR)'
+                  value={quotationTotal}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       )}
       {!inquiryMode && (
         <div className='flex items-end justify-between border-t pt-4'>
