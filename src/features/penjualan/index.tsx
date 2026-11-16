@@ -101,7 +101,15 @@ const toSalesRow = (
   const dpp = totalAfterDiscount
   const ppn = dpp * (ppnPct / 100)
   const modalRequested = getModalSubtotal(quotationData)
-  const actualPurchase = getActualModalSubtotal(invoice)
+  const storedActualSubtotal = quotation?.formInfo?.modalAktualSubtotal
+  const actualPurchase = getActualModalSubtotal(
+    quotation &&
+      storedActualSubtotal !== undefined &&
+      storedActualSubtotal !== null &&
+      String(storedActualSubtotal).trim() !== ''
+      ? quotation
+      : invoice
+  )
   const grossProfit = totalAfterDiscount - actualPurchase
   const marketingFee = Math.max(grossProfit, 0) * 0.1
   const hsiShare = modalRequested * 0.08
