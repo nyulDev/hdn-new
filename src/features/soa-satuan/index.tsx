@@ -21,6 +21,12 @@ import { ThemeSwitch } from '@/components/theme-switch'
 const formatCurrency = (value: number) =>
   `${Math.round(value).toLocaleString('id-ID')} IDR`
 
+const normalizeCustomerName = (customer: string) =>
+  customer.normalize('NFC').trim().replace(/\s+/g, ' ')
+
+const getCustomerKey = (customer: string) =>
+  normalizeCustomerName(customer).toLocaleLowerCase('id-ID')
+
 const formatDate = (value: Date | string | undefined) => {
   if (!value) return '-'
   const date =
@@ -286,14 +292,26 @@ export function SoaSatuan() {
       })
       .map((row, index) => ({ ...row, id: index + 1 }))
   }, [activeQuotationNumbers, dateSortOrder, invoices, referenceDate])
-  const customers = useMemo(
-    () => [...new Set(allRows.map((row) => row.customer))].sort(),
-    [allRows]
-  )
+  const customers = useMemo(() => {
+    const uniqueCustomers = new Map<string, string>()
+    const customerNames = allRows
+      .map((row) => normalizeCustomerName(row.customer))
+      .filter(Boolean)
+      .sort()
+
+    customerNames.forEach((customer) => {
+      const key = getCustomerKey(customer)
+      if (!uniqueCustomers.has(key)) uniqueCustomers.set(key, customer)
+    })
+
+    return [...uniqueCustomers.values()].sort()
+  }, [allRows])
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     return allRows.filter((row) => {
-      const matchesPt = selectedPt === 'all' || row.customer === selectedPt
+      const matchesPt =
+        selectedPt === 'all' ||
+        getCustomerKey(row.customer) === getCustomerKey(selectedPt)
       const matchesSearch =
         !query ||
         `${row.invoiceNumber} ${row.vessel} ${row.customer}`
